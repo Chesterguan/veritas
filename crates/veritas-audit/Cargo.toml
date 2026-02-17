@@ -1,0 +1,15 @@
+[package]
+name = "veritas-audit"
+version = "0.1.0"
+edition = "2021"
+description = "Immutable, append-only, SHA-256 hash-chained audit trail for the VERITAS runtime"
+
+[dependencies]
+veritas-contracts.workspace = true
+veritas-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+chrono.workspace = true
+tracing.workspace = true

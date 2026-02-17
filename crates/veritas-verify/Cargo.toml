@@ -1,0 +1,13 @@
+[package]
+name = "veritas-verify"
+version = "0.1.0"
+edition = "2021"
+description = "Output verification with JSON Schema and semantic rules for the VERITAS runtime"
+
+[dependencies]
+veritas-contracts = { workspace = true }
+veritas-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+jsonschema = "0.28"
+tracing = { workspace = true }

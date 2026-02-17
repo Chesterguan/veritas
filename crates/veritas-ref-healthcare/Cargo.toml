@@ -1,0 +1,16 @@
+[package]
+name = "veritas-ref-healthcare"
+version = "0.1.0"
+edition = "2021"
+description = "Healthcare reference runtime demonstrating VERITAS in three clinical AI scenarios"
+
+[dependencies]
+veritas-contracts.workspace = true
+veritas-core.workspace = true
+veritas-policy.workspace = true
+veritas-audit.workspace = true
+veritas-verify.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tracing.workspace = true

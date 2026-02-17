@@ -1,0 +1,124 @@
+# Healthcare demo policy
+#
+# Rules are evaluated in declaration order — the first matching rule wins.
+# This file enforces the principle of least privilege for a healthcare AI agent.
+#
+# Actions referenced here mirror the strings returned by
+# Agent::describe_action() in the healthcare demo agent.
+#
+# Updated: 2026-02-17
+
+# ── PHI (Protected Health Information) access ─────────────────────────────────
+
+[[rules]]
+id = "deny-bulk-phi-export"
+description = "Agents may never export a bulk PHI dataset"
+action = "export_phi_bulk"
+resource = "*"
+verdict = "deny"
+deny_reason = "bulk PHI export is unconditionally prohibited; contact compliance"
+
+[[rules]]
+id = "allow-read-own-phi"
+description = "Agent may read a single patient's PHI when it holds the phi:read capability"
+action = "read_patient_record"
+resource = "*"
+required_capabilities = ["phi:read"]
+verdict = "allow"
+
+[[rules]]
+id = "require-approval-write-phi"
+description = "Writing PHI requires physician approval and the phi:write capability"
+action = "write_patient_record"
+resource = "*"
+required_capabilities = ["phi:write"]
+verdict = "require-approval"
+approval_reason = "modifying patient records requires attending physician sign-off"
+approver_role = "attending_physician"
+
+# ── Prescriptions ─────────────────────────────────────────────────────────────
+
+[[rules]]
+id = "require-approval-prescribe"
+description = "All prescription actions require attending physician approval"
+action = "prescribe_medication"
+resource = "*"
+required_capabilities = ["prescribe:write"]
+verdict = "require-approval"
+approval_reason = "prescriptions must be reviewed and authorised by the attending physician"
+approver_role = "attending_physician"
+
+[[rules]]
+id = "deny-prescribe-controlled"
+description = "Controlled substance prescriptions are never automated"
+action = "prescribe_controlled_substance"
+resource = "*"
+verdict = "deny"
+deny_reason = "controlled substance prescriptions require an in-person physician; automation is prohibited"
+
+# ── Lab results ───────────────────────────────────────────────────────────────
+
+[[rules]]
+id = "allow-read-lab-results"
+description = "Agent may read lab results for the active patient encounter"
+action = "read_lab_results"
+resource = "*"
+required_capabilities = ["phi:read", "lab:read"]
+verdict = "allow"
+
+[[rules]]
+id = "require-verification-flag-abnormal"
+description = "Flagging abnormal lab results requires a content verification scan"
+action = "flag_abnormal_result"
+resource = "*"
+required_capabilities = ["lab:flag"]
+verdict = "require-verification"
+verification_check_id = "abnormal-result-content-scan"
+
+# ── Messaging ─────────────────────────────────────────────────────────────────
+
+[[rules]]
+id = "allow-send-appointment-reminder"
+description = "Agent may send appointment reminders without additional checks"
+action = "send_appointment_reminder"
+resource = "*"
+required_capabilities = ["messaging:send"]
+verdict = "allow"
+
+[[rules]]
+id = "require-approval-send-diagnosis"
+description = "Sending a diagnosis to the patient requires physician review"
+action = "send_diagnosis_message"
+resource = "*"
+required_capabilities = ["messaging:send", "phi:read"]
+verdict = "require-approval"
+approval_reason = "diagnosis communications must be reviewed by the care team before delivery"
+approver_role = "attending_physician"
+
+# ── Administrative ────────────────────────────────────────────────────────────
+
+[[rules]]
+id = "allow-read-scheduling"
+description = "Agent may read appointment scheduling information"
+action = "read_schedule"
+resource = "*"
+required_capabilities = ["scheduling:read"]
+verdict = "allow"
+
+[[rules]]
+id = "allow-write-scheduling"
+description = "Agent may create or modify appointments"
+action = "write_schedule"
+resource = "*"
+required_capabilities = ["scheduling:write"]
+verdict = "allow"
+
+# ── Catch-all deny ────────────────────────────────────────────────────────────
+
+[[rules]]
+id = "deny-all-unmatched"
+description = "Any action not explicitly allowed above is denied"
+action = "*"
+resource = "*"
+verdict = "deny"
+deny_reason = "action not permitted: no policy rule explicitly allows this operation"

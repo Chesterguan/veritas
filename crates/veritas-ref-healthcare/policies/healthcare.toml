@@ -1,0 +1,47 @@
+# Healthcare reference runtime policy
+#
+# Rules are evaluated in declaration order — the first matching rule wins.
+# This policy covers all three demo scenarios:
+#   1. Drug Interaction Checker
+#   2. Clinical Note Summarizer
+#   3. Patient Data Query
+#
+# Updated: 2026-02-17
+
+# ── Scenario 1: Drug Interaction Checker ──────────────────────────────────────
+
+[[rules]]
+id = "allow-drug-interaction-check"
+description = "Agent may query the drug interaction database when it holds drug-database.read"
+action = "drug-interaction-check"
+resource = "drug-database"
+required_capabilities = ["drug-database.read"]
+verdict = "allow"
+
+# ── Scenario 2: Clinical Note Summarizer ──────────────────────────────────────
+
+[[rules]]
+id = "allow-summarize-clinical-notes"
+description = "Agent may summarize clinical notes when it holds clinical-notes.read"
+action = "summarize"
+resource = "clinical-notes"
+required_capabilities = ["clinical-notes.read"]
+verdict = "allow"
+
+# ── Scenario 3: Patient Data Query — consent required ─────────────────────────
+
+[[rules]]
+id = "deny-patient-query-no-consent"
+description = "Patient record queries are unconditionally denied when consent flag is absent"
+action = "query"
+resource = "patient-records-no-consent"
+verdict = "deny"
+deny_reason = "patient data access denied: patient has not provided consent for AI-assisted queries"
+
+[[rules]]
+id = "allow-patient-query-with-consent"
+description = "Agent may query patient records when it holds patient-records.read and consent is present"
+action = "query"
+resource = "patient-records"
+required_capabilities = ["patient-records.read"]
+verdict = "allow"

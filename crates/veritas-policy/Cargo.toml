@@ -1,0 +1,13 @@
+[package]
+name = "veritas-policy"
+version = "0.1.0"
+edition = "2021"
+description = "TOML-driven deny-by-default policy engine for the VERITAS runtime"
+
+[dependencies]
+veritas-contracts.workspace = true
+veritas-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml = "0.8"
+tracing.workspace = true

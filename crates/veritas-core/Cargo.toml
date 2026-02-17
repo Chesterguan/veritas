@@ -1,0 +1,12 @@
+[package]
+name = "veritas-core"
+version = "0.1.0"
+edition = "2021"
+description = "Deterministic policy-bound executor for the VERITAS runtime"
+
+[dependencies]
+veritas-contracts = { path = "../veritas-contracts" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }

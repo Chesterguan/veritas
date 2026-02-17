@@ -1,0 +1,12 @@
+[package]
+name = "veritas-contracts"
+version = "0.1.0"
+edition = "2021"
+description = "Shared types, schemas, and contracts for the VERITAS runtime"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }

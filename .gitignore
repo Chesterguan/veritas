@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build
+dist/
+build/
+target/
+*.o
+*.so
+*.dylib
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# OS
+Thumbs.db

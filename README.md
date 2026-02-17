@@ -1,8 +1,21 @@
-# VERITAS
+<p align="center">
+  <img src="assets/logo.jpeg" alt="VERITAS" width="600">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License">
+  <img src="https://img.shields.io/badge/build-passing-green" alt="Build">
+  <img src="https://img.shields.io/badge/tests-45%20passing-green" alt="Tests">
+  <img src="https://img.shields.io/badge/rust-1.70%2B-orange" alt="Rust">
+</p>
+
+<p align="center">
+  <strong>Making good agents better — safe, auditable, and verifiable — without making them slow.</strong>
+</p>
+
+---
 
 Lightweight, deterministic, policy-bound, auditable, and verifiable execution runtime for AI agents operating in regulated environments.
-
-**Making good agents better — safe, auditable, and verifiable — without making them slow.**
 
 > Reference domain: Healthcare
 
@@ -85,10 +98,38 @@ See [`docs/`](./docs) for full documentation.
 | 日本語 | [WHITEPAPER.ja.md](docs/whitepaper/WHITEPAPER.ja.md) |
 | Français | [WHITEPAPER.fr.md](docs/whitepaper/WHITEPAPER.fr.md) |
 
+## Quick Start
+
+### Prerequisites
+
+- Rust 1.70+ ([install](https://rustup.rs/))
+
+### Build & Test
+
+```bash
+git clone https://github.com/veritas-rt/veritas.git
+cd veritas
+cargo test --workspace       # 45 tests, all passing
+```
+
+### Run the Healthcare Demo
+
+```bash
+cargo run -p demo -- run-all
+```
+
+### Interactive TUI Demo
+
+```bash
+cargo run -p veritas-tui
+```
+
+The TUI lets you select scenarios, toggle patient consent and agent capabilities, and watch VERITAS enforce policy in real time.
+
 ## Contributing
 
-VERITAS is open source. Community contributions — including new translations — are welcome. See [docs/README.md](docs/README.md) for guidelines.
+VERITAS is open source. Community contributions — including new translations — are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 
-TBD
+Licensed under Apache License 2.0. See [LICENSE](LICENSE) for details.

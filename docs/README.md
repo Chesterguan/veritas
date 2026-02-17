@@ -2,9 +2,9 @@
 
 > Last updated: 2026-02-17
 
-## Whitepaper v0.2
+## Whitepaper v0.3
 
-The whitepaper describes VERITAS vision, design philosophy, system architecture, and core models.
+The whitepaper describes VERITAS vision, design philosophy, system architecture, core models, healthcare reference domain, and competitive positioning.
 
 | Language | File |
 |----------|------|
@@ -15,7 +15,7 @@ The whitepaper describes VERITAS vision, design philosophy, system architecture,
 
 ## Yellow Paper (coming soon)
 
-Technical specification and formal definitions for the VERITAS runtime.
+Technical specification and formal definitions for the VERITAS runtime — execution semantics, policy language, audit schema, and verification protocol.
 
 ## Contributing Translations
 

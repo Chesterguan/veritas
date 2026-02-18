@@ -118,6 +118,10 @@ cargo test --workspace       # 45 tests, all passing
 cargo run -p demo -- run-all
 ```
 
+<p align="center">
+  <img src="assets/demo.gif" alt="VERITAS Healthcare Demo" width="900">
+</p>
+
 ### Interactive TUI Demo
 
 ```bash

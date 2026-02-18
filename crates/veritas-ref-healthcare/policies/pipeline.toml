@@ -1,0 +1,47 @@
+# VERITAS Pipeline Policy — Scenario 4: Multi-Agent Clinical Decision Pipeline
+#
+# Four sequential agents, each with its own allow rule.
+# Rules are evaluated in declaration order; first match wins.
+# Deny-by-default: any (action, resource) pair not listed here is denied.
+#
+# Updated: 2026-02-18
+
+# ── Stage 1: Symptom Analyzer ─────────────────────────────────────────────────
+
+[[rules]]
+id = "allow-symptom-analysis"
+description = "Symptom analyzer may read clinical symptom data when it holds clinical-data.read"
+action = "analyze"
+resource = "symptom-data"
+required_capabilities = ["clinical-data.read"]
+verdict = "allow"
+
+# ── Stage 2: Diagnosis Suggester ──────────────────────────────────────────────
+
+[[rules]]
+id = "allow-diagnosis-suggestion"
+description = "Diagnosis suggester may read clinical analysis output when it holds clinical-data.read"
+action = "suggest-diagnosis"
+resource = "clinical-analysis"
+required_capabilities = ["clinical-data.read"]
+verdict = "allow"
+
+# ── Stage 3: Treatment Planner ────────────────────────────────────────────────
+
+[[rules]]
+id = "allow-treatment-planning"
+description = "Treatment planner may write treatment plans when it holds treatment.write"
+action = "plan-treatment"
+resource = "diagnosis-data"
+required_capabilities = ["treatment.write"]
+verdict = "allow"
+
+# ── Stage 4: Drug Safety Checker ──────────────────────────────────────────────
+
+[[rules]]
+id = "allow-drug-safety-check"
+description = "Drug safety checker may query the drug interaction database when it holds drug-database.read"
+action = "check-drug-safety"
+resource = "drug-database"
+required_capabilities = ["drug-database.read"]
+verdict = "allow"

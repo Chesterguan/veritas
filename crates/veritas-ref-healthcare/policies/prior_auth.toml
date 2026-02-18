@@ -1,0 +1,53 @@
+# VERITAS Prior Authorization Policy — Scenario 5: Prior Authorization Workflow
+#
+# Rules are evaluated in declaration order; first match wins.
+# Deny-by-default: any (action, resource) pair not listed here is denied.
+#
+# ORDERING NOTE: deny-uncovered-procedure must appear before
+# allow-insurance-eligibility-check because both match action = "check-coverage".
+# Sub-case B routes to resource = "uncovered-procedure" (hits deny rule first).
+# Sub-case A routes to resource = "insurance-records" (skips deny, hits allow).
+#
+# Updated: 2026-02-18
+
+# ── Step 1: Clinical Proposal — always requires physician approval ─────────────
+
+[[rules]]
+id = "require-approval-high-cost-procedure"
+description = "High-cost procedures (e.g. cardiac MRI) require attending physician approval"
+action = "propose-procedure"
+resource = "high-cost-procedure"
+verdict = "require-approval"
+approval_reason = "cardiac MRI is a high-cost procedure requiring attending physician sign-off"
+approver_role = "attending-physician"
+
+# ── Step 2A: Insurance eligibility — denied when procedure not covered ─────────
+# Must appear BEFORE allow-insurance-eligibility-check (first-match-wins).
+
+[[rules]]
+id = "deny-uncovered-procedure"
+description = "Insurance eligibility check denied when procedure is not covered by the plan"
+action = "check-coverage"
+resource = "uncovered-procedure"
+verdict = "deny"
+deny_reason = "procedure is not covered under the patient's current insurance plan"
+
+# ── Step 2B: Insurance eligibility — allowed when procedure is covered ─────────
+
+[[rules]]
+id = "allow-insurance-eligibility-check"
+description = "Insurance eligibility agent may check coverage when it holds insurance.read"
+action = "check-coverage"
+resource = "insurance-records"
+required_capabilities = ["insurance.read"]
+verdict = "allow"
+
+# ── Step 3: PA Submission ──────────────────────────────────────────────────────
+
+[[rules]]
+id = "allow-pa-submission"
+description = "PA submission agent may write to the PA system when it holds pa.write"
+action = "submit-pa"
+resource = "pa-system"
+required_capabilities = ["pa.write"]
+verdict = "allow"

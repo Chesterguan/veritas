@@ -108,6 +108,30 @@ pub fn get_patient_notes(patient_id: &str) -> Value {
     })
 }
 
+// ── Patient Symptoms (mock) ───────────────────────────────────────────────────
+
+/// Return mock symptom data for the given patient ID.
+///
+/// Used by `SymptomAnalyzerAgent` in Scenario 4 (Clinical Decision Pipeline).
+/// All data is fictional and hardcoded.
+pub fn get_patient_symptoms(patient_id: &str) -> Value {
+    json!({
+        "patient_id": patient_id,
+        "reported_symptoms": [
+            { "symptom": "fatigue", "duration_days": 21, "severity": "moderate" },
+            { "symptom": "dyspnea_on_exertion", "duration_days": 21, "severity": "mild" },
+            { "symptom": "pallor", "duration_days": 14, "severity": "mild" }
+        ],
+        "vitals": {
+            "heart_rate_bpm": 82,
+            "blood_pressure": "138/88",
+            "spo2_percent": 97,
+            "temperature_c": 36.8
+        },
+        "recorded_date": "2026-02-18"
+    })
+}
+
 // ── Patient Records (mock) ────────────────────────────────────────────────────
 
 /// Return a mock patient record for the given patient ID.
@@ -138,5 +162,25 @@ pub fn get_patient_record(patient_id: &str) -> Value {
         ],
         "ai_query_consent": has_consent,
         "last_updated": "2026-02-14"
+    })
+}
+
+// ── Insurance Coverage (mock) ─────────────────────────────────────────────────
+
+/// Return mock insurance coverage data for the given procedure code.
+///
+/// Used by `InsuranceEligibilityAgent` in Scenario 5 (Prior Authorization).
+/// Procedures whose code ends with "-uncovered" are not covered by the plan.
+/// All data is fictional and hardcoded.
+pub fn get_insurance_coverage(procedure_code: &str) -> Value {
+    let covered = !procedure_code.ends_with("-uncovered");
+
+    json!({
+        "procedure_code": procedure_code,
+        "covered": covered,
+        "plan_name": if covered { json!("Blue Shield PPO") } else { serde_json::Value::Null },
+        "copay_usd": if covered { json!(250) } else { serde_json::Value::Null },
+        "requires_prior_auth": true,
+        "checked_date": "2026-02-18"
     })
 }

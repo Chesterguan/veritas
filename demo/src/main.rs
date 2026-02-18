@@ -1,6 +1,6 @@
 //! VERITAS Healthcare Reference Runtime — Demo CLI
 //!
-//! Runs one or all of the three healthcare demo scenarios.  Each scenario uses
+//! Runs one or all of the five healthcare demo scenarios.  Each scenario uses
 //! real VERITAS components (policy engine, audit writer, verifier, executor)
 //! wired together with mock clinical data.
 //!
@@ -9,24 +9,34 @@
 //!   cargo run -p demo -- drug-interaction
 //!   cargo run -p demo -- note-summarizer
 //!   cargo run -p demo -- patient-query
+//!   cargo run -p demo -- clinical-pipeline
+//!   cargo run -p demo -- prior-auth
 
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
-use veritas_ref_healthcare::scenarios::{drug_interaction, note_summarizer, patient_query};
+use veritas_ref_healthcare::scenarios::{
+    clinical_pipeline, drug_interaction, note_summarizer, patient_query, prior_auth,
+};
 
 // ── CLI definition ────────────────────────────────────────────────────────────
 
 /// VERITAS — Policy-bound AI runtime healthcare demo.
 ///
-/// Each subcommand runs one or all of the three clinical AI scenarios,
+/// Each subcommand runs one or all of the five clinical AI scenarios,
 /// demonstrating VERITAS's policy, capability, and verification enforcement.
 #[derive(Parser)]
 #[command(
     name = "demo",
     about = "VERITAS healthcare reference runtime demo",
     long_about = "Runs VERITAS healthcare demo scenarios showing policy enforcement,\n\
-                  capability checks, output verification, and audit chain integrity."
+                  capability checks, output verification, and audit chain integrity.\n\n\
+                  Scenarios:\n\
+                  1. Drug Interaction Checker     — capability-gated DB query\n\
+                  2. Clinical Note Summarizer     — PII custom verifier rule\n\
+                  3. Patient Data Query           — Allow / CapabilityMissing / Deny\n\
+                  4. Clinical Decision Pipeline   — 4-agent chain with output handoff\n\
+                  5. Prior Authorization Workflow — RequireApproval to completion"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -35,7 +45,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Run all three healthcare scenarios in sequence.
+    /// Run all five healthcare scenarios in sequence.
     RunAll,
     /// Scenario 1: Drug Interaction Checker (capability-gated DB query).
     DrugInteraction,
@@ -43,6 +53,10 @@ enum Command {
     NoteSummarizer,
     /// Scenario 3: Patient Data Query (Allow / CapabilityMissing / Deny).
     PatientQuery,
+    /// Scenario 4: Multi-Agent Clinical Decision Pipeline (4-agent chain).
+    ClinicalPipeline,
+    /// Scenario 5: Prior Authorization Workflow (RequireApproval → approval → submit).
+    PriorAuth,
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -66,6 +80,8 @@ fn main() {
         Command::DrugInteraction => run_drug_interaction(),
         Command::NoteSummarizer => run_note_summarizer(),
         Command::PatientQuery => run_patient_query(),
+        Command::ClinicalPipeline => run_clinical_pipeline(),
+        Command::PriorAuth => run_prior_auth(),
     };
 
     match result {
@@ -85,6 +101,8 @@ fn run_all() -> veritas_contracts::error::VeritasResult<()> {
     run_drug_interaction()?;
     run_note_summarizer()?;
     run_patient_query()?;
+    run_clinical_pipeline()?;
+    run_prior_auth()?;
     Ok(())
 }
 
@@ -98,6 +116,14 @@ fn run_note_summarizer() -> veritas_contracts::error::VeritasResult<()> {
 
 fn run_patient_query() -> veritas_contracts::error::VeritasResult<()> {
     patient_query::run_scenario()
+}
+
+fn run_clinical_pipeline() -> veritas_contracts::error::VeritasResult<()> {
+    clinical_pipeline::run_scenario()
+}
+
+fn run_prior_auth() -> veritas_contracts::error::VeritasResult<()> {
+    prior_auth::run_scenario()
 }
 
 // ── Banner ────────────────────────────────────────────────────────────────────

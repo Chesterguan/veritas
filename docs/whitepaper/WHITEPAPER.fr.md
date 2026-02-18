@@ -4,7 +4,7 @@
 
 *Léger · Déterministe · Auditable · Vérifiable*
 
-> Dernière mise à jour : 2026-02-17
+> Dernière mise à jour : 2026-02-18
 
 ---
 

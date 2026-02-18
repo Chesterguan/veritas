@@ -1,6 +1,6 @@
 # Contributing to VERITAS
 
-> Last updated: 2026-02-17
+> Last updated: 2026-02-18
 
 Thank you for your interest in contributing to VERITAS. This guide will help you get started.
 

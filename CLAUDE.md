@@ -1,6 +1,6 @@
 # VERITAS — Project Instructions
 
-> Last updated: 2026-02-17
+> Last updated: 2026-02-18
 
 ## Overview
 
@@ -39,21 +39,44 @@ Think: Red Hat is to Linux what VERITAS is to ZeroClaw/OpenClaw.
 - **Trusted:** Runtime core, Policy engine, Audit engine, Verifier
 - **Untrusted:** LLM, Tools, Input data, External environment
 
+## Project Structure
+
+```
+crates/
+  veritas-contracts/       # Shared types, traits, error types (15 tests)
+  veritas-core/            # Executor pipeline (6 tests)
+  veritas-policy/          # TOML deny-by-default policy engine (8 tests)
+  veritas-audit/           # SHA-256 hash-chained audit trail (6 tests)
+  veritas-verify/          # JSON Schema + semantic rule verification (10 tests)
+  veritas-ref-healthcare/  # Healthcare reference runtime (3 scenarios)
+demo/                      # CLI demo runner (clap)
+tui/                       # Interactive TUI demo (ratatui 0.29 + crossterm 0.28)
+assets/                    # Logo and demo GIF
+docs/                      # Whitepaper v0.3 (EN, ZH, JA, FR)
+```
+
 ## Core Components
 
 | Component | Purpose |
 |-----------|---------|
-| `veritas-core` | Deterministic runtime (ZeroClaw lineage) |
+| `veritas-contracts` | Capability / policy / audit schemas, shared types |
+| `veritas-core` | Deterministic runtime executor (ZeroClaw lineage) |
 | `veritas-policy` | Deny-by-default permission & risk engine |
 | `veritas-audit` | Immutable, append-only execution trace |
 | `veritas-verify` | Output validation before delivery |
-| `veritas-contracts` | Capability / policy / audit schemas |
 
 ## Execution Model
 
 ```
 State → Policy → Capability → Audit → Verify → Next State
 ```
+
+## Key Crate Versions
+
+- `thiserror = "2.0"` (not 1.0)
+- `jsonschema = "0.28"` (API: `validator_for()` + `iter_errors()`, NOT `JSONSchema::compile()`)
+- `ratatui = "0.29"` + `crossterm = "0.28"` (TUI)
+- `clap = "4.0"` (CLI)
 
 ## Code Guidelines
 
@@ -67,3 +90,5 @@ State → Policy → Capability → Audit → Verify → Next State
 - Policy evaluation must be fast — microseconds, not milliseconds
 - Prefer simplicity over abstraction — three similar lines beat a premature helper
 - Follow ZeroClaw's principle: explicit over implicit, small over large
+- Core runtime is fully synchronous — no tokio in the trusted path
+- Agent.propose() NEVER runs unless policy returns Allow (structural guarantee in Executor)

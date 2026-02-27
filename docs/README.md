@@ -1,6 +1,6 @@
 # VERITAS Documentation
 
-> Last updated: 2026-02-18
+> Last updated: 2026-02-27
 
 ## Whitepaper v0.3
 
@@ -13,13 +13,17 @@ The whitepaper describes VERITAS vision, design philosophy, system architecture,
 | 日本語 | [WHITEPAPER.ja.md](whitepaper/WHITEPAPER.ja.md) |
 | Français | [WHITEPAPER.fr.md](whitepaper/WHITEPAPER.fr.md) |
 
-## Yellow Paper (coming soon)
+## Yellow Paper v0.1
 
 Technical specification and formal definitions for the VERITAS runtime — execution semantics, policy language, audit schema, and verification protocol.
 
+| Language | File |
+|----------|------|
+| English | [YELLOWPAPER.en.md](yellowpaper/YELLOWPAPER.en.md) |
+
 ## Project Status
 
-VERITAS is fully implemented with 45 passing tests across 5 core crates, a healthcare reference runtime with 3 demo scenarios, a CLI demo runner, and an interactive TUI demo.
+VERITAS is fully implemented with 58 passing tests across 5 core crates, a healthcare reference runtime with 5 demo scenarios, a CLI demo runner, and an interactive TUI demo.
 
 ### Crate Overview
 
@@ -30,7 +34,7 @@ VERITAS is fully implemented with 45 passing tests across 5 core crates, a healt
 | `veritas-policy` | 8 | TOML deny-by-default policy engine |
 | `veritas-audit` | 6 | SHA-256 hash-chained audit trail |
 | `veritas-verify` | 10 | JSON Schema + semantic rule verification |
-| `veritas-ref-healthcare` | — | 3 healthcare demo scenarios |
+| `veritas-ref-healthcare` | 13 | 5 healthcare demo scenarios |
 | `demo` | — | CLI demo runner |
 | `veritas-tui` | — | Interactive Ratatui TUI |
 
@@ -39,11 +43,13 @@ VERITAS is fully implemented with 45 passing tests across 5 core crates, a healt
 1. **Drug Interaction Checker** — policy Allow flow, output schema verification
 2. **Clinical Note Summarizer** — PII detection via custom verifier rule, audit trail
 3. **Patient Data Query** — capability-based access control, consent enforcement (3 sub-cases: allow, capability-missing, consent-denied)
+4. **Multi-Agent Clinical Pipeline** — 4-agent chain (SymptomAnalyzer → DiagnosisSuggester → TreatmentPlanner → DrugSafetyChecker), independent audit chains
+5. **Prior Authorization Workflow** — RequireApproval lifecycle with physician approval simulation
 
 ### Demos
 
 ```bash
-cargo run -p demo -- run-all        # CLI: all 3 scenarios
+cargo run -p demo -- run-all        # CLI: all 5 scenarios
 cargo run -p demo -- drug-interaction  # individual scenario
 cargo run -p veritas-tui             # interactive TUI
 ```

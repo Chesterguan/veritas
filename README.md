@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License">
   <img src="https://img.shields.io/badge/build-passing-green" alt="Build">
-  <img src="https://img.shields.io/badge/tests-45%20passing-green" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-58%20passing-green" alt="Tests">
   <img src="https://img.shields.io/badge/rust-1.70%2B-orange" alt="Rust">
 </p>
 
@@ -109,7 +109,7 @@ See [`docs/`](./docs) for full documentation.
 ```bash
 git clone https://github.com/veritas-rt/veritas.git
 cd veritas
-cargo test --workspace       # 45 tests, all passing
+cargo test --workspace       # 58 tests, all passing
 ```
 
 ### Run the Healthcare Demo

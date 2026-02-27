@@ -1,6 +1,6 @@
 # Contributing to VERITAS
 
-> Last updated: 2026-02-18
+> Last updated: 2026-02-27
 
 Thank you for your interest in contributing to VERITAS. This guide will help you get started.
 
@@ -20,7 +20,7 @@ cargo test --workspace
 cargo run -p demo -- run-all
 ```
 
-If all 45 tests pass and the demo runs, you're ready to contribute.
+If all 58 tests pass and the demo runs, you're ready to contribute.
 
 ## Project Structure
 
@@ -31,10 +31,10 @@ crates/
   veritas-policy/          # TOML-driven deny-by-default policy engine
   veritas-audit/           # SHA-256 hash-chained append-only audit trail
   veritas-verify/          # JSON Schema + semantic rule verification
-  veritas-ref-healthcare/  # Healthcare reference runtime (3 demo scenarios)
+  veritas-ref-healthcare/  # Healthcare reference runtime (5 demo scenarios)
 demo/                      # CLI demo runner
 tui/                       # Interactive TUI demo
-docs/                      # Whitepaper (EN, ZH, JA, FR) and yellow paper (coming soon)
+docs/                      # Whitepaper v0.3 + Yellow Paper v0.1 (EN, ZH, JA, FR)
 ```
 
 ## How to Contribute

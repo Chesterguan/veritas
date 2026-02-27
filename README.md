@@ -107,7 +107,7 @@ See [`docs/`](./docs) for full documentation.
 ### Build & Test
 
 ```bash
-git clone https://github.com/veritas-rt/veritas.git
+git clone https://github.com/Chesterguan/veritas.git
 cd veritas
 cargo test --workspace       # 58 tests, all passing
 ```

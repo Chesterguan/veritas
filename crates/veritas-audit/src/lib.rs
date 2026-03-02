@@ -76,7 +76,10 @@ mod tests {
         writer.write(&make_record(1, "second")).unwrap();
         writer.write(&make_record(2, "third")).unwrap();
 
-        assert!(writer.verify_integrity(), "chain must be valid after sequential writes");
+        assert!(
+            writer.verify_integrity(),
+            "chain must be valid after sequential writes"
+        );
     }
 
     /// Mutating any event's record field breaks the chain.
@@ -91,8 +94,7 @@ mod tests {
         {
             let mut state = writer.state.lock().unwrap();
             // Change the payload in the first event's record.
-            state.events[0].record.input.payload =
-                json!({ "text": "TAMPERED" });
+            state.events[0].record.input.payload = json!({ "text": "TAMPERED" });
         }
 
         // The chain must now fail verification because event 0's this_hash
@@ -130,8 +132,7 @@ mod tests {
         for (idx, event) in log.events.iter().enumerate() {
             assert_eq!(
                 event.sequence, idx as u64,
-                "sequence at position {} should be {}",
-                idx, idx
+                "sequence at position {idx} should be {idx}"
             );
         }
     }

@@ -89,7 +89,7 @@ fn main() {
             println!("All selected scenarios completed successfully.");
         }
         Err(e) => {
-            eprintln!("Demo error: {}", e);
+            eprintln!("Demo error: {e}");
             std::process::exit(1);
         }
     }

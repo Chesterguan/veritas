@@ -48,8 +48,7 @@ mod tests {
         caps.grant(Capability::new("b"));
         caps.grant(Capability::new("c"));
 
-        let names: std::collections::HashSet<String> =
-            caps.all().map(|c| c.0.clone()).collect();
+        let names: std::collections::HashSet<String> = caps.all().map(|c| c.0.clone()).collect();
 
         assert_eq!(names.len(), 3);
         assert!(names.contains("a"));

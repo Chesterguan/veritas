@@ -45,16 +45,14 @@ use veritas_core::{executor::Executor, traits::AuditWriter};
 use veritas_policy::engine::TomlPolicyEngine;
 use veritas_ref_healthcare::{
     scenarios::drug_interaction::DrugInteractionAgent,
-    scenarios::note_summarizer::NoteSummarizerAgent,
-    scenarios::patient_query::PatientQueryAgent,
+    scenarios::note_summarizer::NoteSummarizerAgent, scenarios::patient_query::PatientQueryAgent,
 };
 use veritas_verify::engine::SchemaVerifier;
 
 // ── Policy TOML (same as the healthcare scenarios use) ────────────────────────
 
-const HEALTHCARE_POLICY: &str = include_str!(
-    "../../crates/veritas-ref-healthcare/policies/healthcare.toml"
-);
+const HEALTHCARE_POLICY: &str =
+    include_str!("../../crates/veritas-ref-healthcare/policies/healthcare.toml");
 
 /// Open policy for the capability-missing sub-case of scenario 3.
 const OPEN_POLICY_FOR_CAPABILITY_TEST: &str = r#"
@@ -227,7 +225,7 @@ fn run_drug_interaction() -> ExecutionCapture {
         Err(e) => {
             return ExecutionCapture {
                 policy_verdict: PolicyVerdict::Deny {
-                    reason: format!("policy load error: {}", e),
+                    reason: format!("policy load error: {e}"),
                 },
                 action: "drug-interaction-check".to_string(),
                 resource: "drug-database".to_string(),
@@ -276,12 +274,19 @@ fn run_drug_interaction() -> ExecutionCapture {
         Ok(StepResult::Complete { output, .. }) | Ok(StepResult::Transitioned { output, .. }) => {
             (PolicyVerdict::Allow, Some(output), None)
         }
-        Ok(StepResult::Denied { reason, .. }) => {
-            (PolicyVerdict::Deny { reason }, None, None)
-        }
-        Ok(StepResult::AwaitingApproval { reason, approver_role, .. }) => {
-            (PolicyVerdict::RequireApproval { reason, approver_role }, None, None)
-        }
+        Ok(StepResult::Denied { reason, .. }) => (PolicyVerdict::Deny { reason }, None, None),
+        Ok(StepResult::AwaitingApproval {
+            reason,
+            approver_role,
+            ..
+        }) => (
+            PolicyVerdict::RequireApproval {
+                reason,
+                approver_role,
+            },
+            None,
+            None,
+        ),
         Err(e) => {
             let v = PolicyVerdict::Deny {
                 reason: e.to_string(),
@@ -313,7 +318,7 @@ fn run_note_summarizer() -> ExecutionCapture {
         Err(e) => {
             return ExecutionCapture {
                 policy_verdict: PolicyVerdict::Deny {
-                    reason: format!("policy load error: {}", e),
+                    reason: format!("policy load error: {e}"),
                 },
                 action: "summarize".to_string(),
                 resource: "clinical-notes".to_string(),
@@ -339,8 +344,7 @@ fn run_note_summarizer() -> ExecutionCapture {
             for label in &forbidden {
                 if summary.contains(label) {
                     return Some(format!(
-                        "summary contains forbidden PII label '{}'; remove before delivery",
-                        label
+                        "summary contains forbidden PII label '{label}'; remove before delivery"
                     ));
                 }
             }
@@ -380,14 +384,23 @@ fn run_note_summarizer() -> ExecutionCapture {
         Ok(StepResult::Complete { output, .. }) | Ok(StepResult::Transitioned { output, .. }) => {
             (PolicyVerdict::Allow, Some(output), None)
         }
-        Ok(StepResult::Denied { reason, .. }) => {
-            (PolicyVerdict::Deny { reason }, None, None)
-        }
-        Ok(StepResult::AwaitingApproval { reason, approver_role, .. }) => {
-            (PolicyVerdict::RequireApproval { reason, approver_role }, None, None)
-        }
+        Ok(StepResult::Denied { reason, .. }) => (PolicyVerdict::Deny { reason }, None, None),
+        Ok(StepResult::AwaitingApproval {
+            reason,
+            approver_role,
+            ..
+        }) => (
+            PolicyVerdict::RequireApproval {
+                reason,
+                approver_role,
+            },
+            None,
+            None,
+        ),
         Err(e) => {
-            let v = PolicyVerdict::Deny { reason: e.to_string() };
+            let v = PolicyVerdict::Deny {
+                reason: e.to_string(),
+            };
             (v, None, Some(e))
         }
     };
@@ -432,7 +445,7 @@ fn run_patient_query(consent_enabled: bool, capability_enabled: bool) -> Executi
         Err(e) => {
             return ExecutionCapture {
                 policy_verdict: PolicyVerdict::Deny {
-                    reason: format!("policy load error: {}", e),
+                    reason: format!("policy load error: {e}"),
                 },
                 action: "query".to_string(),
                 resource: "patient-records".to_string(),
@@ -449,7 +462,9 @@ fn run_patient_query(consent_enabled: bool, capability_enabled: bool) -> Executi
     let execution_id = ExecutionId::new();
     let audit = Arc::new(InMemoryAuditWriter::new(execution_id.0.to_string()));
     let verifier = SchemaVerifier::new();
-    let agent = PatientQueryAgent { patient_id: patient_id.clone() };
+    let agent = PatientQueryAgent {
+        patient_id: patient_id.clone(),
+    };
     let schema = patient_query_schema();
 
     let state = AgentState {
@@ -483,14 +498,23 @@ fn run_patient_query(consent_enabled: bool, capability_enabled: bool) -> Executi
         Ok(StepResult::Complete { output, .. }) | Ok(StepResult::Transitioned { output, .. }) => {
             (PolicyVerdict::Allow, Some(output), None)
         }
-        Ok(StepResult::Denied { reason, .. }) => {
-            (PolicyVerdict::Deny { reason }, None, None)
-        }
-        Ok(StepResult::AwaitingApproval { reason, approver_role, .. }) => {
-            (PolicyVerdict::RequireApproval { reason, approver_role }, None, None)
-        }
+        Ok(StepResult::Denied { reason, .. }) => (PolicyVerdict::Deny { reason }, None, None),
+        Ok(StepResult::AwaitingApproval {
+            reason,
+            approver_role,
+            ..
+        }) => (
+            PolicyVerdict::RequireApproval {
+                reason,
+                approver_role,
+            },
+            None,
+            None,
+        ),
         Err(e) => {
-            let v = PolicyVerdict::Deny { reason: e.to_string() };
+            let v = PolicyVerdict::Deny {
+                reason: e.to_string(),
+            };
             (v, None, Some(e))
         }
     };
@@ -614,11 +638,11 @@ fn build_pipeline_steps(cap: &ExecutionCapture) -> Vec<PipelineStep> {
         ),
         PolicyVerdict::RequireApproval { approver_role, .. } => (
             StepStatus::AwaitingApproval,
-            format!("RequireApproval — approver: {}", approver_role),
+            format!("RequireApproval — approver: {approver_role}"),
         ),
         PolicyVerdict::RequireVerification { check_id } => (
             StepStatus::Pass,
-            format!("RequireVerification — check: {}", check_id),
+            format!("RequireVerification — check: {check_id}"),
         ),
     };
     steps.push(PipelineStep {
@@ -659,16 +683,28 @@ fn build_pipeline_steps(cap: &ExecutionCapture) -> Vec<PipelineStep> {
 
     // ── Step 3: Agent ─────────────────────────────────────────────────────────
     let (agent_status, agent_detail) = if cap.output.is_some() {
-        (StepStatus::Pass, "propose() called, output produced".to_string())
+        (
+            StepStatus::Pass,
+            "propose() called, output produced".to_string(),
+        )
     } else if matches!(
         cap.policy_verdict,
         PolicyVerdict::Deny { .. } | PolicyVerdict::RequireApproval { .. }
     ) {
-        (StepStatus::Pending, "propose() blocked by policy".to_string())
+        (
+            StepStatus::Pending,
+            "propose() blocked by policy".to_string(),
+        )
     } else if matches!(&cap.error, Some(VeritasError::CapabilityMissing { .. })) {
-        (StepStatus::Pending, "propose() blocked by capability check".to_string())
+        (
+            StepStatus::Pending,
+            "propose() blocked by capability check".to_string(),
+        )
     } else {
-        (StepStatus::Fail, "propose() did not produce output".to_string())
+        (
+            StepStatus::Fail,
+            "propose() did not produce output".to_string(),
+        )
     };
     steps.push(PipelineStep {
         name: "Agent".to_string(),
@@ -694,9 +730,17 @@ fn build_pipeline_steps(cap: &ExecutionCapture) -> Vec<PipelineStep> {
     let (audit_status, audit_detail) = if cap.audit_events.is_empty() {
         (StepStatus::Pending, "no events recorded".to_string())
     } else {
-        let integrity_str = if cap.chain_integrity { "VERIFIED" } else { "FAILED" };
+        let integrity_str = if cap.chain_integrity {
+            "VERIFIED"
+        } else {
+            "FAILED"
+        };
         (
-            if cap.chain_integrity { StepStatus::Pass } else { StepStatus::Fail },
+            if cap.chain_integrity {
+                StepStatus::Pass
+            } else {
+                StepStatus::Fail
+            },
             format!(
                 "{} event(s), chain: {}",
                 cap.audit_events.len(),
@@ -752,10 +796,10 @@ fn ui(f: &mut Frame, app: &App) {
     let outer_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // header
-            Constraint::Min(10),   // pipeline + audit (left/right split)
+            Constraint::Length(3),  // header
+            Constraint::Min(10),    // pipeline + audit (left/right split)
             Constraint::Length(10), // output details
-            Constraint::Length(3), // footer
+            Constraint::Length(3),  // footer
         ])
         .split(full);
 
@@ -796,14 +840,18 @@ fn render_header(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         } else {
             Style::default().fg(Color::White)
         };
-        spans.push(Span::styled(format!("{} {}  ", key, scenario.name()), style));
+        spans.push(Span::styled(
+            format!("{} {}  ", key, scenario.name()),
+            style,
+        ));
     }
 
     let header_line = Line::from(spans);
-    let header = Paragraph::new(header_line)
-        .block(Block::default().borders(Borders::ALL).border_style(
-            Style::default().fg(Color::DarkGray),
-        ));
+    let header = Paragraph::new(header_line).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::DarkGray)),
+    );
     f.render_widget(header, area);
 }
 
@@ -882,7 +930,11 @@ fn render_audit_trail(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 _ => Color::Gray,
             };
             let check = if entry.verified { " ✓" } else { " ✗" };
-            let check_color = if entry.verified { Color::Green } else { Color::Red };
+            let check_color = if entry.verified {
+                Color::Green
+            } else {
+                Color::Red
+            };
 
             let line = Line::from(vec![
                 Span::styled(
@@ -895,10 +947,7 @@ fn render_audit_trail(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                     Style::default().fg(kind_color).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw("] "),
-                Span::styled(
-                    entry.hash_short.as_str(),
-                    Style::default().fg(Color::Gray),
-                ),
+                Span::styled(entry.hash_short.as_str(), Style::default().fg(Color::Gray)),
                 Span::styled(check, Style::default().fg(check_color)),
             ]);
             items.push(ListItem::new(line));
@@ -986,7 +1035,11 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     } else {
         Color::Red
     };
-    let cap_granted_label = if cap.capability_granted { "[GRANTED]" } else { "[NOT GRANTED]" };
+    let cap_granted_label = if cap.capability_granted {
+        "[GRANTED]"
+    } else {
+        "[NOT GRANTED]"
+    };
     lines.push(Line::from(vec![
         Span::styled("  Capability:  ", Style::default().fg(Color::Gray)),
         Span::raw(format!("{} ", cap.capability_name)),
@@ -999,12 +1052,8 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     if let Some(output) = &cap.output {
         match app.selected {
             Scenario::DrugInteraction => {
-                let severity = output.payload["result"]["severity"]
-                    .as_str()
-                    .unwrap_or("?");
-                let recommendation = output.payload["recommendation"]
-                    .as_str()
-                    .unwrap_or("?");
+                let severity = output.payload["result"]["severity"].as_str().unwrap_or("?");
+                let recommendation = output.payload["recommendation"].as_str().unwrap_or("?");
                 let severity_color = match severity {
                     "HIGH" => Color::Red,
                     "MEDIUM" => Color::Yellow,
@@ -1013,7 +1062,12 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 };
                 lines.push(Line::from(vec![
                     Span::styled("  Severity:    ", Style::default().fg(Color::Gray)),
-                    Span::styled(severity, Style::default().fg(severity_color).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        severity,
+                        Style::default()
+                            .fg(severity_color)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                 ]));
                 lines.push(Line::from(vec![
                     Span::styled("  Rec:         ", Style::default().fg(Color::Gray)),
@@ -1028,14 +1082,11 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 let note_count = output.payload["note_count"].as_u64().unwrap_or(0);
                 lines.push(Line::from(vec![
                     Span::styled("  Notes:       ", Style::default().fg(Color::Gray)),
-                    Span::raw(format!("{} clinical note(s) summarized", note_count)),
+                    Span::raw(format!("{note_count} clinical note(s) summarized")),
                 ]));
                 lines.push(Line::from(vec![
                     Span::styled("  Summary:     ", Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        truncate(summary, 80),
-                        Style::default().fg(Color::White),
-                    ),
+                    Span::styled(truncate(summary, 80), Style::default().fg(Color::White)),
                 ]));
             }
             Scenario::PatientQuery => {
@@ -1060,7 +1111,7 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 ]));
                 lines.push(Line::from(vec![
                     Span::styled("  Conditions:  ", Style::default().fg(Color::Gray)),
-                    Span::raw(format!("{} condition(s) returned", cond_count)),
+                    Span::raw(format!("{cond_count} condition(s) returned")),
                 ]));
             }
         }
@@ -1078,15 +1129,14 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         if !reason.is_empty() {
             lines.push(Line::from(vec![
                 Span::styled("  Reason:      ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    truncate(&reason, 80),
-                    Style::default().fg(Color::Red),
-                ),
+                Span::styled(truncate(&reason, 80), Style::default().fg(Color::Red)),
             ]));
         }
     }
 
-    let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: false });
     f.render_widget(paragraph, area);
 }
 
@@ -1105,7 +1155,11 @@ fn render_footer(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         } else {
             "consent: OFF"
         };
-        let consent_color = if app.consent_enabled { Color::Green } else { Color::Red };
+        let consent_color = if app.consent_enabled {
+            Color::Green
+        } else {
+            Color::Red
+        };
         spans.push(Span::styled("[c] ", Style::default().fg(Color::Cyan)));
         spans.push(Span::styled(
             consent_label,
@@ -1118,12 +1172,13 @@ fn render_footer(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         } else {
             "capability: OFF"
         };
-        let cap_color = if app.capability_enabled { Color::Green } else { Color::Red };
+        let cap_color = if app.capability_enabled {
+            Color::Green
+        } else {
+            Color::Red
+        };
         spans.push(Span::styled("[Tab] ", Style::default().fg(Color::Cyan)));
-        spans.push(Span::styled(
-            cap_label,
-            Style::default().fg(cap_color),
-        ));
+        spans.push(Span::styled(cap_label, Style::default().fg(cap_color)));
         spans.push(Span::raw("  "));
     }
 
@@ -1146,7 +1201,7 @@ fn truncate(s: &str, max: usize) -> String {
         s.to_string()
     } else {
         let cut: String = s.chars().take(max.saturating_sub(1)).collect();
-        format!("{}…", cut)
+        format!("{cut}…")
     }
 }
 

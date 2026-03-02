@@ -20,9 +20,7 @@ use tracing::{debug, warn};
 use veritas_contracts::{
     agent::AgentOutput,
     error::VeritasResult,
-    verify::{
-        OutputSchema, VerificationFailure, VerificationReport, VerificationRuleType,
-    },
+    verify::{OutputSchema, VerificationFailure, VerificationReport, VerificationRuleType},
 };
 use veritas_core::traits::Verifier;
 
@@ -150,28 +148,32 @@ impl Verifier for SchemaVerifier {
 
                 // ── AllowedValues ─────────────────────────────────────────────
                 // The field value must appear in the exhaustive allowed set.
-                VerificationRuleType::AllowedValues { field_path, allowed } => {
-                    match Self::resolve_path(payload, field_path) {
-                        None => Some(format!(
-                            "field '{field_path}' is missing; cannot check allowed values"
-                        )),
-                        Some(actual) => {
-                            if allowed.contains(actual) {
-                                None
-                            } else {
-                                Some(format!(
+                VerificationRuleType::AllowedValues {
+                    field_path,
+                    allowed,
+                } => match Self::resolve_path(payload, field_path) {
+                    None => Some(format!(
+                        "field '{field_path}' is missing; cannot check allowed values"
+                    )),
+                    Some(actual) => {
+                        if allowed.contains(actual) {
+                            None
+                        } else {
+                            Some(format!(
                                     "field '{field_path}' has value {actual} which is not in the allowed set"
                                 ))
-                            }
                         }
                     }
-                }
+                },
 
                 // ── ForbiddenPattern ──────────────────────────────────────────
                 // The field string value must not contain the forbidden pattern
                 // as a substring.  Non-string fields pass silently — the rule is
                 // only meaningful for string values.
-                VerificationRuleType::ForbiddenPattern { field_path, pattern } => {
+                VerificationRuleType::ForbiddenPattern {
+                    field_path,
+                    pattern,
+                } => {
                     match Self::resolve_path(payload, field_path) {
                         None => None, // field absent — nothing to check
                         Some(v) => {
@@ -289,7 +291,11 @@ mod tests {
 
         let report = verifier.verify(&output, &schema).unwrap();
 
-        assert!(report.passed, "expected pass, failures: {:?}", report.failures);
+        assert!(
+            report.passed,
+            "expected pass, failures: {:?}",
+            report.failures
+        );
         assert!(report.failures.is_empty());
     }
 
@@ -313,7 +319,10 @@ mod tests {
 
         let report = verifier.verify(&output, &schema).unwrap();
 
-        assert!(!report.passed, "expected failure for missing required field");
+        assert!(
+            !report.passed,
+            "expected failure for missing required field"
+        );
         assert!(!report.failures.is_empty());
         assert_eq!(report.failures[0].rule_id, "json-schema");
     }
@@ -339,7 +348,11 @@ mod tests {
 
         let report = verifier.verify(&output, &schema).unwrap();
 
-        assert!(report.passed, "expected pass, failures: {:?}", report.failures);
+        assert!(
+            report.passed,
+            "expected pass, failures: {:?}",
+            report.failures
+        );
     }
 
     /// A payload missing the required field path produces a failure that
@@ -395,7 +408,11 @@ mod tests {
 
         let report = verifier.verify(&output, &schema).unwrap();
 
-        assert!(report.passed, "expected pass, failures: {:?}", report.failures);
+        assert!(
+            report.passed,
+            "expected pass, failures: {:?}",
+            report.failures
+        );
     }
 
     /// When the field value is outside the allowed set the rule fails.
@@ -459,10 +476,7 @@ mod tests {
     #[test]
     fn test_custom_rule_pass() {
         let mut verifier = SchemaVerifier::new();
-        verifier.register_rule(
-            "always-pass",
-            Box::new(|_payload| None),
-        );
+        verifier.register_rule("always-pass", Box::new(|_payload| None));
 
         let output = make_output(json!({ "field": "value" }));
         let schema = make_schema(
@@ -478,7 +492,11 @@ mod tests {
 
         let report = verifier.verify(&output, &schema).unwrap();
 
-        assert!(report.passed, "expected pass, failures: {:?}", report.failures);
+        assert!(
+            report.passed,
+            "expected pass, failures: {:?}",
+            report.failures
+        );
     }
 
     /// A registered custom function that returns Some(msg) causes a failure

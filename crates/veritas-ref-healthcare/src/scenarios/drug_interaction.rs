@@ -24,7 +24,10 @@ use veritas_contracts::{
     execution::{StepRecord, StepResult},
     verify::{OutputSchema, VerificationRule, VerificationRuleType},
 };
-use veritas_core::{executor::Executor, traits::{Agent, AuditWriter}};
+use veritas_core::{
+    executor::Executor,
+    traits::{Agent, AuditWriter},
+};
 use veritas_policy::engine::TomlPolicyEngine;
 use veritas_verify::engine::SchemaVerifier;
 
@@ -78,7 +81,10 @@ impl Agent for DrugInteractionAgent {
     }
 
     fn describe_action(&self, _state: &AgentState, _input: &AgentInput) -> (String, String) {
-        ("drug-interaction-check".to_string(), "drug-database".to_string())
+        (
+            "drug-interaction-check".to_string(),
+            "drug-database".to_string(),
+        )
     }
 
     fn is_terminal(&self, state: &AgentState) -> bool {
@@ -204,24 +210,20 @@ pub fn run_scenario() -> VeritasResult<()> {
 
     match &result {
         StepResult::Complete { output, .. } | StepResult::Transitioned { output, .. } => {
-            let severity = output.payload["result"]["severity"]
-                .as_str()
-                .unwrap_or("?");
-            let recommendation = output.payload["recommendation"]
-                .as_str()
-                .unwrap_or("?");
+            let severity = output.payload["result"]["severity"].as_str().unwrap_or("?");
+            let recommendation = output.payload["recommendation"].as_str().unwrap_or("?");
 
             println!("  Policy verdict:         Allow");
             println!("  Capability check:       PASS");
             println!("  Verification result:    PASS (all 3 required fields present)");
-            println!("  Interaction severity:   {}", severity);
-            println!("  Recommendation:         {}", recommendation);
+            println!("  Interaction severity:   {severity}");
+            println!("  Recommendation:         {recommendation}");
         }
         StepResult::Denied { reason, .. } => {
-            println!("  DENIED: {}", reason);
+            println!("  DENIED: {reason}");
         }
         StepResult::AwaitingApproval { reason, .. } => {
-            println!("  AWAITING APPROVAL: {}", reason);
+            println!("  AWAITING APPROVAL: {reason}");
         }
     }
 

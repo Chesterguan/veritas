@@ -34,7 +34,10 @@ use veritas_contracts::{
     execution::{StepRecord, StepResult},
     verify::{OutputSchema, VerificationRule, VerificationRuleType},
 };
-use veritas_core::{executor::Executor, traits::{Agent, AuditWriter}};
+use veritas_core::{
+    executor::Executor,
+    traits::{Agent, AuditWriter},
+};
 use veritas_policy::engine::TomlPolicyEngine;
 use veritas_verify::engine::SchemaVerifier;
 
@@ -122,15 +125,13 @@ fn patient_query_schema() -> OutputSchema {
             "type": "object",
             "required": ["patient_id"]
         }),
-        rules: vec![
-            VerificationRule {
-                rule_id: "req-patient-id".to_string(),
-                description: "Output must contain the patient ID".to_string(),
-                rule_type: VerificationRuleType::RequiredField {
-                    field_path: "patient_id".to_string(),
-                },
+        rules: vec![VerificationRule {
+            rule_id: "req-patient-id".to_string(),
+            description: "Output must contain the patient ID".to_string(),
+            rule_type: VerificationRuleType::RequiredField {
+                field_path: "patient_id".to_string(),
             },
-        ],
+        }],
     }
 }
 
@@ -166,7 +167,9 @@ pub fn run_scenario() -> VeritasResult<()> {
         let audit = Arc::new(InMemoryAuditWriter::new(execution_id.0.to_string()));
         let verifier = SchemaVerifier::new();
         let schema = patient_query_schema();
-        let agent = PatientQueryAgent { patient_id: "patient-101".to_string() };
+        let agent = PatientQueryAgent {
+            patient_id: "patient-101".to_string(),
+        };
 
         let state = AgentState {
             agent_id: AgentId("patient-query-agent".to_string()),
@@ -202,10 +205,10 @@ pub fn run_scenario() -> VeritasResult<()> {
                 println!("  Policy verdict:         Allow");
                 println!("  Capability check:       PASS");
                 println!("  Verification result:    PASS");
-                println!("  Record conditions:      {} condition(s) returned", conditions);
+                println!("  Record conditions:      {conditions} condition(s) returned");
             }
             StepResult::Denied { reason, .. } => {
-                println!("  DENIED: {}", reason);
+                println!("  DENIED: {reason}");
             }
             _ => {}
         }
@@ -240,7 +243,9 @@ pub fn run_scenario() -> VeritasResult<()> {
         let audit = Arc::new(InMemoryAuditWriter::new(execution_id.0.to_string()));
         let verifier = SchemaVerifier::new();
         let schema = patient_query_schema();
-        let agent = PatientQueryAgent { patient_id: "patient-101".to_string() };
+        let agent = PatientQueryAgent {
+            patient_id: "patient-101".to_string(),
+        };
 
         let state = AgentState {
             agent_id: AgentId("patient-query-agent".to_string()),
@@ -270,7 +275,7 @@ pub fn run_scenario() -> VeritasResult<()> {
         match result {
             Err(VeritasError::CapabilityMissing { capability, action }) => {
                 println!("  Policy verdict:         Allow (policy permits the action)");
-                println!("  Capability check:       FAIL — '{}' missing for '{}'", capability, action);
+                println!("  Capability check:       FAIL — '{capability}' missing for '{action}'");
                 println!("  Agent propose() called: NO (executor blocked before agent logic)");
                 let log = audit.export_log();
                 println!(
@@ -280,10 +285,10 @@ pub fn run_scenario() -> VeritasResult<()> {
                 println!("  RESULT: CapabilityMissing (expected)");
             }
             Err(e) => {
-                println!("  Unexpected error: {}", e);
+                println!("  Unexpected error: {e}");
             }
             Ok(StepResult::Denied { reason, .. }) => {
-                println!("  DENIED by policy: {}", reason);
+                println!("  DENIED by policy: {reason}");
             }
             Ok(_) => {
                 println!("  Unexpectedly succeeded");
@@ -309,7 +314,9 @@ pub fn run_scenario() -> VeritasResult<()> {
         // Patient ID ending in "nc" → get_patient_record sets consent = false
         // → describe_action returns resource = "patient-records-no-consent"
         // → policy rule "deny-patient-query-no-consent" fires.
-        let agent = PatientQueryAgent { patient_id: "patient-201nc".to_string() };
+        let agent = PatientQueryAgent {
+            patient_id: "patient-201nc".to_string(),
+        };
 
         let state = AgentState {
             agent_id: AgentId("patient-query-agent".to_string()),
@@ -339,8 +346,10 @@ pub fn run_scenario() -> VeritasResult<()> {
         match result {
             StepResult::Denied { reason, .. } => {
                 println!("  Policy verdict:         Deny");
-                println!("  Deny reason:            {}", reason);
-                println!("  Agent propose() called: NO (blocked by policy before capability check)");
+                println!("  Deny reason:            {reason}");
+                println!(
+                    "  Agent propose() called: NO (blocked by policy before capability check)"
+                );
                 println!("  RESULT: Policy Denied (expected)");
             }
             StepResult::Complete { .. } | StepResult::Transitioned { .. } => {

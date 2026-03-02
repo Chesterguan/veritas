@@ -33,7 +33,10 @@ use veritas_contracts::{
     execution::{StepRecord, StepResult},
     verify::{OutputSchema, VerificationRule, VerificationRuleType},
 };
-use veritas_core::{executor::Executor, traits::{Agent, AuditWriter}};
+use veritas_core::{
+    executor::Executor,
+    traits::{Agent, AuditWriter},
+};
 use veritas_policy::engine::TomlPolicyEngine;
 use veritas_verify::engine::SchemaVerifier;
 
@@ -50,9 +53,7 @@ pub struct SymptomAnalyzerAgent;
 
 impl Agent for SymptomAnalyzerAgent {
     fn propose(&self, state: &AgentState, input: &AgentInput) -> VeritasResult<AgentOutput> {
-        let patient_id = input.payload["patient_id"]
-            .as_str()
-            .unwrap_or("unknown");
+        let patient_id = input.payload["patient_id"].as_str().unwrap_or("unknown");
 
         let symptoms = get_patient_symptoms(patient_id);
 
@@ -112,7 +113,7 @@ impl Agent for DiagnosisSuggesterAgent {
 
         // Deterministic mock: flag set (fatigue, dyspnea, pallor) maps to anemia differential.
         let has_fatigue = flags.iter().any(|f| f.as_str() == Some("fatigue"));
-        let has_pallor  = flags.iter().any(|f| f.as_str() == Some("pallor"));
+        let has_pallor = flags.iter().any(|f| f.as_str() == Some("pallor"));
 
         let primary = if has_fatigue && has_pallor {
             "Iron deficiency anemia"
@@ -149,7 +150,10 @@ impl Agent for DiagnosisSuggesterAgent {
     }
 
     fn describe_action(&self, _state: &AgentState, _input: &AgentInput) -> (String, String) {
-        ("suggest-diagnosis".to_string(), "clinical-analysis".to_string())
+        (
+            "suggest-diagnosis".to_string(),
+            "clinical-analysis".to_string(),
+        )
     }
 
     fn is_terminal(&self, state: &AgentState) -> bool {
@@ -227,9 +231,7 @@ impl Agent for DrugSafetyCheckerAgent {
         for i in 0..meds.len() {
             for j in (i + 1)..meds.len() {
                 let result = check_drug_interaction(meds[i], meds[j]);
-                let severity = result["result"]["severity"]
-                    .as_str()
-                    .unwrap_or("UNKNOWN");
+                let severity = result["result"]["severity"].as_str().unwrap_or("UNKNOWN");
 
                 if severity != "UNKNOWN" {
                     if severity == "HIGH" {
@@ -388,7 +390,9 @@ fn drug_safety_checker_schema() -> OutputSchema {
             // Fails when overall_risk = "HIGH" and reviewed = false.
             VerificationRule {
                 rule_id: "no-high-risk-unreviewed".to_string(),
-                description: "HIGH-risk drug interactions must be explicitly reviewed before delivery".to_string(),
+                description:
+                    "HIGH-risk drug interactions must be explicitly reviewed before delivery"
+                        .to_string(),
                 rule_type: VerificationRuleType::Custom {
                     function_name: "no-high-risk-unreviewed".to_string(),
                 },
@@ -421,7 +425,9 @@ pub fn run_scenario() -> VeritasResult<()> {
     println!("=== Scenario 4: Multi-Agent Clinical Decision Pipeline ===");
     println!();
     println!("  Patient: patient-101");
-    println!("  Pipeline: SymptomAnalyzer → DiagnosisSuggester → TreatmentPlanner → DrugSafetyChecker");
+    println!(
+        "  Pipeline: SymptomAnalyzer → DiagnosisSuggester → TreatmentPlanner → DrugSafetyChecker"
+    );
     println!();
 
     // ── Stage 1: Symptom Analyzer ─────────────────────────────────────────────
@@ -473,12 +479,15 @@ pub fn run_scenario() -> VeritasResult<()> {
                 .unwrap_or_default();
             println!("  Policy verdict:  Allow");
             println!("  Verification:    PASS");
-            println!("  Flags detected:  {}", flags);
-            println!("  Severity level:  {}", output.payload["severity_level"].as_str().unwrap_or("?"));
+            println!("  Flags detected:  {flags}");
+            println!(
+                "  Severity level:  {}",
+                output.payload["severity_level"].as_str().unwrap_or("?")
+            );
             output.clone()
         }
         other => {
-            println!("  UNEXPECTED: {:?}", other);
+            println!("  UNEXPECTED: {other:?}");
             return Ok(());
         }
     };
@@ -486,7 +495,11 @@ pub fn run_scenario() -> VeritasResult<()> {
     let log_1 = audit_1.export_log();
     println!(
         "  Audit chain 1:   {} ({} event(s))",
-        if audit_1.verify_integrity() { "VERIFIED" } else { "FAILED" },
+        if audit_1.verify_integrity() {
+            "VERIFIED"
+        } else {
+            "FAILED"
+        },
         log_1.events.len()
     );
     println!();
@@ -538,12 +551,12 @@ pub fn run_scenario() -> VeritasResult<()> {
             let primary = output.payload["primary_hypothesis"].as_str().unwrap_or("?");
             println!("  Policy verdict:  Allow");
             println!("  Verification:    PASS");
-            println!("  Diagnoses:       {} differential(s)", dx_count);
-            println!("  Primary:         {}", primary);
+            println!("  Diagnoses:       {dx_count} differential(s)");
+            println!("  Primary:         {primary}");
             output.clone()
         }
         other => {
-            println!("  UNEXPECTED: {:?}", other);
+            println!("  UNEXPECTED: {other:?}");
             return Ok(());
         }
     };
@@ -551,7 +564,11 @@ pub fn run_scenario() -> VeritasResult<()> {
     let log_2 = audit_2.export_log();
     println!(
         "  Audit chain 2:   {} ({} event(s))",
-        if audit_2.verify_integrity() { "VERIFIED" } else { "FAILED" },
+        if audit_2.verify_integrity() {
+            "VERIFIED"
+        } else {
+            "FAILED"
+        },
         log_2.events.len()
     );
     println!();
@@ -606,11 +623,11 @@ pub fn run_scenario() -> VeritasResult<()> {
                 .unwrap_or_default();
             println!("  Policy verdict:  Allow");
             println!("  Verification:    PASS");
-            println!("  Medications:     {}", meds);
+            println!("  Medications:     {meds}");
             output.clone()
         }
         other => {
-            println!("  UNEXPECTED: {:?}", other);
+            println!("  UNEXPECTED: {other:?}");
             return Ok(());
         }
     };
@@ -618,7 +635,11 @@ pub fn run_scenario() -> VeritasResult<()> {
     let log_3 = audit_3.export_log();
     println!(
         "  Audit chain 3:   {} ({} event(s))",
-        if audit_3.verify_integrity() { "VERIFIED" } else { "FAILED" },
+        if audit_3.verify_integrity() {
+            "VERIFIED"
+        } else {
+            "FAILED"
+        },
         log_3.events.len()
     );
     println!();
@@ -690,7 +711,7 @@ pub fn run_scenario() -> VeritasResult<()> {
 
             println!("  Policy verdict:  Allow");
             println!("  Verification:    PASS (reviewed={reviewed})");
-            println!("  Overall risk:    {} ({} known interaction(s))", overall, found);
+            println!("  Overall risk:    {overall} ({found} known interaction(s))");
 
             if let Some(details) = report["details"].as_array() {
                 for d in details {
@@ -705,14 +726,18 @@ pub fn run_scenario() -> VeritasResult<()> {
             }
         }
         other => {
-            println!("  UNEXPECTED: {:?}", other);
+            println!("  UNEXPECTED: {other:?}");
         }
     }
 
     let log_4 = audit_4.export_log();
     println!(
         "  Audit chain 4:   {} ({} event(s))",
-        if audit_4.verify_integrity() { "VERIFIED" } else { "FAILED" },
+        if audit_4.verify_integrity() {
+            "VERIFIED"
+        } else {
+            "FAILED"
+        },
         log_4.events.len()
     );
     println!();
@@ -726,7 +751,11 @@ pub fn run_scenario() -> VeritasResult<()> {
 
     println!(
         "  Pipeline complete. All 4 audit chains: {}",
-        if all_verified { "VERIFIED" } else { "INTEGRITY FAILURE" }
+        if all_verified {
+            "VERIFIED"
+        } else {
+            "INTEGRITY FAILURE"
+        }
     );
     println!("  Scenario 4 complete.");
     println!();
@@ -743,8 +772,8 @@ mod tests {
         agent::{AgentId, AgentInput, AgentState, ExecutionId},
         policy::{PolicyContext, PolicyVerdict},
     };
-    use veritas_policy::engine::TomlPolicyEngine;
     use veritas_core::traits::PolicyEngine;
+    use veritas_policy::engine::TomlPolicyEngine;
 
     fn make_state(agent_id: &str) -> AgentState {
         AgentState {
@@ -814,8 +843,12 @@ mod tests {
                 "reviewed": true
             }
         });
-        let risk = payload["safety_report"]["overall_risk"].as_str().unwrap_or("NONE");
-        let reviewed = payload["safety_report"]["reviewed"].as_bool().unwrap_or(false);
+        let risk = payload["safety_report"]["overall_risk"]
+            .as_str()
+            .unwrap_or("NONE");
+        let reviewed = payload["safety_report"]["reviewed"]
+            .as_bool()
+            .unwrap_or(false);
         let result = if risk == "HIGH" && !reviewed {
             Some("blocked")
         } else {
@@ -833,8 +866,12 @@ mod tests {
                 "reviewed": false
             }
         });
-        let risk = payload["safety_report"]["overall_risk"].as_str().unwrap_or("NONE");
-        let reviewed = payload["safety_report"]["reviewed"].as_bool().unwrap_or(false);
+        let risk = payload["safety_report"]["overall_risk"]
+            .as_str()
+            .unwrap_or("NONE");
+        let reviewed = payload["safety_report"]["reviewed"]
+            .as_bool()
+            .unwrap_or(false);
         let result: Option<&str> = if risk == "HIGH" && !reviewed {
             Some("blocked")
         } else {
@@ -850,7 +887,11 @@ mod tests {
 
         let cases = [
             ("analyze", "symptom-data", "clinical-data.read"),
-            ("suggest-diagnosis", "clinical-analysis", "clinical-data.read"),
+            (
+                "suggest-diagnosis",
+                "clinical-analysis",
+                "clinical-data.read",
+            ),
             ("plan-treatment", "diagnosis-data", "treatment.write"),
             ("check-drug-safety", "drug-database", "drug-database.read"),
         ];
@@ -882,8 +923,14 @@ mod tests {
             .iter()
             .filter_map(|v| v.as_str())
             .collect();
-        assert!(meds.contains(&"warfarin"), "treatment plan must include warfarin");
-        assert!(meds.contains(&"aspirin"), "treatment plan must include aspirin");
+        assert!(
+            meds.contains(&"warfarin"),
+            "treatment plan must include warfarin"
+        );
+        assert!(
+            meds.contains(&"aspirin"),
+            "treatment plan must include aspirin"
+        );
     }
 
     /// CapabilitySet missing blocks the stage even when policy says Allow.
@@ -896,7 +943,11 @@ mod tests {
         let verdict = policy.evaluate(&ctx).unwrap();
         // The policy engine checks required_capabilities in the rule.
         // With no caps in context, it should deny (defense-in-depth).
-        assert_ne!(verdict, PolicyVerdict::Allow, "missing capability should not yield Allow");
+        assert_ne!(
+            verdict,
+            PolicyVerdict::Allow,
+            "missing capability should not yield Allow"
+        );
         let _ = caps; // silence unused warning
     }
 }

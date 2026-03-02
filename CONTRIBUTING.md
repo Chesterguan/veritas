@@ -1,6 +1,6 @@
 # Contributing to VERITAS
 
-> Last updated: 2026-02-27
+> Last updated: 2026-03-02
 
 Thank you for your interest in contributing to VERITAS. This guide will help you get started.
 
@@ -8,13 +8,13 @@ Thank you for your interest in contributing to VERITAS. This guide will help you
 
 ### Prerequisites
 
-- Rust 1.70+ (`rustup` recommended)
+- Rust 1.74+ (`rustup` recommended)
 - Git
 
 ### Getting Started
 
 ```bash
-git clone https://github.com/veritas-rt/veritas.git
+git clone https://github.com/Chesterguan/veritas.git
 cd veritas
 cargo test --workspace
 cargo run -p demo -- run-all
@@ -58,10 +58,10 @@ verdict = "allow"  # or "deny", "require-approval"
 Register a custom rule in your scenario's `run_scenario()`:
 
 ```rust
-verifier.register_rule("rule-name", |payload| {
+verifier.register_rule("rule-name", Box::new(|payload| {
     // Return None if valid, Some("error message") if invalid
     None
-});
+}));
 ```
 
 ### Add a New Healthcare Scenario

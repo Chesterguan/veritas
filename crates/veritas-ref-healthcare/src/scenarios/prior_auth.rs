@@ -31,7 +31,10 @@ use veritas_contracts::{
     execution::{StepRecord, StepResult},
     verify::{OutputSchema, VerificationRule, VerificationRuleType},
 };
-use veritas_core::{executor::Executor, traits::{Agent, AuditWriter}};
+use veritas_core::{
+    executor::Executor,
+    traits::{Agent, AuditWriter},
+};
 use veritas_policy::engine::TomlPolicyEngine;
 use veritas_verify::engine::SchemaVerifier;
 
@@ -75,7 +78,10 @@ impl Agent for ClinicalProposalAgent {
     }
 
     fn describe_action(&self, _state: &AgentState, _input: &AgentInput) -> (String, String) {
-        ("propose-procedure".to_string(), "high-cost-procedure".to_string())
+        (
+            "propose-procedure".to_string(),
+            "high-cost-procedure".to_string(),
+        )
     }
 
     fn is_terminal(&self, state: &AgentState) -> bool {
@@ -197,15 +203,13 @@ fn clinical_proposal_schema() -> OutputSchema {
             "type": "object",
             "required": ["procedure", "urgency"]
         }),
-        rules: vec![
-            VerificationRule {
-                rule_id: "req-procedure".to_string(),
-                description: "Proposal must name the requested procedure".to_string(),
-                rule_type: VerificationRuleType::RequiredField {
-                    field_path: "procedure".to_string(),
-                },
+        rules: vec![VerificationRule {
+            rule_id: "req-procedure".to_string(),
+            description: "Proposal must name the requested procedure".to_string(),
+            rule_type: VerificationRuleType::RequiredField {
+                field_path: "procedure".to_string(),
             },
-        ],
+        }],
     }
 }
 
@@ -226,7 +230,8 @@ fn insurance_eligibility_schema() -> OutputSchema {
             },
             VerificationRule {
                 rule_id: "req-covered".to_string(),
-                description: "Eligibility result must state whether procedure is covered".to_string(),
+                description: "Eligibility result must state whether procedure is covered"
+                    .to_string(),
                 rule_type: VerificationRuleType::RequiredField {
                     field_path: "covered".to_string(),
                 },
@@ -311,33 +316,41 @@ fn run_step1_and_simulate_approval() -> VeritasResult<(String, String)> {
     let result = executor.step(&agent, state, input, &caps)?;
 
     match result {
-        StepResult::AwaitingApproval { reason, approver_role, .. } => {
+        StepResult::AwaitingApproval {
+            reason,
+            approver_role,
+            ..
+        } => {
             println!("  Step 1 — ClinicalProposalAgent");
             println!("  Action:         propose-procedure | Resource: high-cost-procedure");
             println!("  Policy verdict: RequireApproval");
-            println!("  Reason:         {}", reason);
-            println!("  Approver role:  {}", approver_role);
+            println!("  Reason:         {reason}");
+            println!("  Approver role:  {approver_role}");
             let log = audit.export_log();
             println!(
                 "  Audit chain:    {} ({} event(s))",
-                if audit.verify_integrity() { "VERIFIED" } else { "FAILED" },
+                if audit.verify_integrity() {
+                    "VERIFIED"
+                } else {
+                    "FAILED"
+                },
                 log.events.len()
             );
             println!();
-            println!("  *** EXECUTION PAUSED — awaiting {} approval ***", approver_role);
+            println!("  *** EXECUTION PAUSED — awaiting {approver_role} approval ***");
             println!();
             println!("  [Simulating physician approval...]");
 
             let token = "PHY-APPROVE-2026-0218".to_string();
-            println!("  Approval token: {}", token);
-            println!("  Approved by:    {}", approver_role);
+            println!("  Approval token: {token}");
+            println!("  Approved by:    {approver_role}");
             println!("  Approved at:    2026-02-18T10:30:00Z");
             println!();
 
             Ok((token, approver_role))
         }
         other => {
-            println!("  UNEXPECTED Step 1 result: {:?}", other);
+            println!("  UNEXPECTED Step 1 result: {other:?}");
             Err(veritas_contracts::error::VeritasError::StateMachineError {
                 reason: "expected AwaitingApproval from Step 1".to_string(),
             })
@@ -408,28 +421,33 @@ pub fn run_scenario() -> VeritasResult<()> {
         let result = executor.step(&agent, state, input, &caps)?;
 
         let step2_output = match result {
-            StepResult::Complete { ref output, .. } | StepResult::Transitioned { ref output, .. } => {
+            StepResult::Complete { ref output, .. }
+            | StepResult::Transitioned { ref output, .. } => {
                 let plan = output.payload["plan_name"].as_str().unwrap_or("?");
                 let copay = output.payload["copay_usd"].as_u64().unwrap_or(0);
                 println!("  Policy verdict: Allow");
                 println!("  Capability:     PASS");
                 println!("  Verification:   PASS");
-                println!("  Coverage:       COVERED ({}, copay ${copay})", plan);
+                println!("  Coverage:       COVERED ({plan}, copay ${copay})");
                 let log = audit.export_log();
                 println!(
                     "  Audit chain:    {} ({} event(s))",
-                    if audit.verify_integrity() { "VERIFIED" } else { "FAILED" },
+                    if audit.verify_integrity() {
+                        "VERIFIED"
+                    } else {
+                        "FAILED"
+                    },
                     log.events.len()
                 );
                 output.clone()
             }
             StepResult::Denied { reason, .. } => {
-                println!("  DENIED: {}", reason);
+                println!("  DENIED: {reason}");
                 println!();
                 return Ok(());
             }
             other => {
-                println!("  UNEXPECTED: {:?}", other);
+                println!("  UNEXPECTED: {other:?}");
                 return Ok(());
             }
         };
@@ -478,17 +496,21 @@ pub fn run_scenario() -> VeritasResult<()> {
                 println!("  Policy verdict: Allow");
                 println!("  Capability:     PASS");
                 println!("  Verification:   PASS");
-                println!("  PA Reference:   {}", pa_ref);
-                println!("  Status:         {}", status);
+                println!("  PA Reference:   {pa_ref}");
+                println!("  Status:         {status}");
                 let log_3 = audit_3.export_log();
                 println!(
                     "  Audit chain:    {} ({} event(s))",
-                    if audit_3.verify_integrity() { "VERIFIED" } else { "FAILED" },
+                    if audit_3.verify_integrity() {
+                        "VERIFIED"
+                    } else {
+                        "FAILED"
+                    },
                     log_3.events.len()
                 );
             }
             other => {
-                println!("  UNEXPECTED: {:?}", other);
+                println!("  UNEXPECTED: {other:?}");
             }
         }
     }
@@ -548,18 +570,22 @@ pub fn run_scenario() -> VeritasResult<()> {
         match result {
             StepResult::Denied { reason, .. } => {
                 println!("  Policy verdict: Deny");
-                println!("  Reason:         {}", reason);
+                println!("  Reason:         {reason}");
                 println!("  Agent propose(): NOT called (blocked before capability check)");
                 let log = audit.export_log();
                 println!(
                     "  Audit chain:    {} ({} denial event(s))",
-                    if audit.verify_integrity() { "VERIFIED" } else { "FAILED" },
+                    if audit.verify_integrity() {
+                        "VERIFIED"
+                    } else {
+                        "FAILED"
+                    },
                     log.events.len()
                 );
                 println!("  RESULT:         PA denied at eligibility — no Step 3.");
             }
             other => {
-                println!("  UNEXPECTED: {:?}", other);
+                println!("  UNEXPECTED: {other:?}");
             }
         }
     }
@@ -578,9 +604,7 @@ pub fn run_scenario() -> VeritasResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use veritas_contracts::{
-        policy::{PolicyContext, PolicyVerdict},
-    };
+    use veritas_contracts::policy::{PolicyContext, PolicyVerdict};
     use veritas_core::traits::PolicyEngine;
     use veritas_policy::engine::TomlPolicyEngine;
 
@@ -606,7 +630,7 @@ mod tests {
             PolicyVerdict::RequireApproval { approver_role, .. } => {
                 assert_eq!(approver_role, "attending-physician");
             }
-            other => panic!("expected RequireApproval, got {:?}", other),
+            other => panic!("expected RequireApproval, got {other:?}"),
         }
     }
 
@@ -629,11 +653,10 @@ mod tests {
             PolicyVerdict::Deny { reason } => {
                 assert!(
                     reason.contains("not covered"),
-                    "deny reason should mention coverage: {}",
-                    reason
+                    "deny reason should mention coverage: {reason}"
                 );
             }
-            other => panic!("expected Deny, got {:?}", other),
+            other => panic!("expected Deny, got {other:?}"),
         }
     }
 
@@ -654,7 +677,7 @@ mod tests {
         let verdict = policy.evaluate(&ctx).unwrap();
         match verdict {
             PolicyVerdict::Deny { .. } => {}
-            other => panic!("expected Deny for missing pa.write capability, got {:?}", other),
+            other => panic!("expected Deny for missing pa.write capability, got {other:?}"),
         }
     }
 

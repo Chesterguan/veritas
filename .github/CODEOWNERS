@@ -1,0 +1,27 @@
+# VERITAS Code Owners
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default — catches everything
+* @Chesterguan
+
+# Core runtime
+crates/veritas-core/       @Chesterguan
+crates/veritas-contracts/  @Chesterguan
+
+# Policy engine
+crates/veritas-policy/     @Chesterguan
+
+# Audit trail
+crates/veritas-audit/      @Chesterguan
+
+# Verification
+crates/veritas-verify/     @Chesterguan
+
+# Healthcare reference
+crates/veritas-ref-healthcare/ @Chesterguan
+
+# CI/CD
+.github/                   @Chesterguan
+
+# Documentation
+docs/                      @Chesterguan

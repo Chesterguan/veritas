@@ -103,5 +103,9 @@ pub trait Verifier: Send + Sync {
     ///
     /// Return a `VerificationReport` with `passed = true` if all rules pass,
     /// or `passed = false` with populated `failures` if any rule fails.
-    fn verify(&self, output: &AgentOutput, schema: &OutputSchema) -> VeritasResult<VerificationReport>;
+    fn verify(
+        &self,
+        output: &AgentOutput,
+        schema: &OutputSchema,
+    ) -> VeritasResult<VerificationReport>;
 }

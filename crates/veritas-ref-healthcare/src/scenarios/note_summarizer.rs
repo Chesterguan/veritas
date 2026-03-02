@@ -25,7 +25,10 @@ use veritas_contracts::{
     execution::{StepRecord, StepResult},
     verify::{OutputSchema, VerificationRule, VerificationRuleType},
 };
-use veritas_core::{executor::Executor, traits::{Agent, AuditWriter}};
+use veritas_core::{
+    executor::Executor,
+    traits::{Agent, AuditWriter},
+};
 use veritas_policy::engine::TomlPolicyEngine;
 use veritas_verify::engine::SchemaVerifier;
 
@@ -45,28 +48,22 @@ pub struct NoteSummarizerAgent;
 
 impl Agent for NoteSummarizerAgent {
     fn propose(&self, state: &AgentState, input: &AgentInput) -> VeritasResult<AgentOutput> {
-        let patient_id = input.payload["patient_id"]
-            .as_str()
-            .unwrap_or("unknown");
+        let patient_id = input.payload["patient_id"].as_str().unwrap_or("unknown");
 
         // Fetch mock clinical notes to simulate reading source data.
         let notes = get_patient_notes(patient_id);
-        let note_count = notes["notes"]
-            .as_array()
-            .map(|a| a.len())
-            .unwrap_or(0);
+        let note_count = notes["notes"].as_array().map(|a| a.len()).unwrap_or(0);
 
         // Deterministic mock summary — simulates what an LLM would produce.
         // Deliberately contains no PII labels (DOB:, SSN:) so the verifier passes.
         let summary = format!(
-            "Patient (ID: {}) presents with a history reviewed across {} clinical notes. \
+            "Patient (ID: {patient_id}) presents with a history reviewed across {note_count} clinical notes. \
              Key findings: mild anemia (Hgb 10.2 g/dL) identified in follow-up labs, \
              with type 2 diabetes and hypertension as active chronic conditions. \
              Current medications include metformin, lisinopril, and iron supplementation. \
              Renal function is preserved (eGFR 74). \
              Plan: continue current regimen, recheck CBC in four weeks, \
-             refer to hematology if no improvement.",
-            patient_id, note_count
+             refer to hematology if no improvement."
         );
 
         Ok(AgentOutput {
@@ -188,8 +185,7 @@ pub fn run_scenario() -> VeritasResult<()> {
             for label in &forbidden {
                 if summary.contains(label) {
                     return Some(format!(
-                        "summary contains forbidden PII label '{}'; remove before delivery",
-                        label
+                        "summary contains forbidden PII label '{label}'; remove before delivery"
                     ));
                 }
             }
@@ -211,7 +207,7 @@ pub fn run_scenario() -> VeritasResult<()> {
     let mut capabilities = CapabilitySet::default();
     capabilities.grant(Capability::new("clinical-notes.read"));
 
-    println!("  Test: summarize clinical notes for patient '{}'", patient_id);
+    println!("  Test: summarize clinical notes for patient '{patient_id}'");
     println!("  Action:   summarize");
     println!("  Resource: clinical-notes");
     println!("  Agent capability: clinical-notes.read [GRANTED]");
@@ -234,23 +230,24 @@ pub fn run_scenario() -> VeritasResult<()> {
 
     match &result {
         StepResult::Complete { output, .. } | StepResult::Transitioned { output, .. } => {
-            let summary = output.payload["summary"]
-                .as_str()
-                .unwrap_or("?");
+            let summary = output.payload["summary"].as_str().unwrap_or("?");
             let note_count = output.payload["note_count"].as_u64().unwrap_or(0);
 
             println!("  Policy verdict:         Allow");
             println!("  Capability check:       PASS");
             println!("  PII label check:        PASS (no forbidden labels detected)");
             println!("  Verification result:    PASS");
-            println!("  Notes summarized:       {}", note_count);
-            println!("  Summary preview:        {}...", &summary[..summary.len().min(120)]);
+            println!("  Notes summarized:       {note_count}");
+            println!(
+                "  Summary preview:        {}...",
+                &summary[..summary.len().min(120)]
+            );
         }
         StepResult::Denied { reason, .. } => {
-            println!("  DENIED: {}", reason);
+            println!("  DENIED: {reason}");
         }
         StepResult::AwaitingApproval { reason, .. } => {
-            println!("  AWAITING APPROVAL: {}", reason);
+            println!("  AWAITING APPROVAL: {reason}");
         }
     }
 

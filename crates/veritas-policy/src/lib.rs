@@ -66,7 +66,9 @@ mod tests {
         "#;
 
         let engine = TomlPolicyEngine::from_toml_str(toml).unwrap();
-        let verdict = engine.evaluate(&ctx("read_record", "patient/42", &[])).unwrap();
+        let verdict = engine
+            .evaluate(&ctx("read_record", "patient/42", &[]))
+            .unwrap();
 
         match verdict {
             PolicyVerdict::Deny { reason } => {
@@ -75,7 +77,7 @@ mod tests {
                     "expected 'denied by default' in reason, got: {reason}"
                 );
             }
-            other => panic!("expected Deny, got {:?}", other),
+            other => panic!("expected Deny, got {other:?}"),
         }
     }
 
@@ -94,7 +96,9 @@ mod tests {
         "#;
 
         let engine = TomlPolicyEngine::from_toml_str(toml).unwrap();
-        let verdict = engine.evaluate(&ctx("read_record", "patient/42", &[])).unwrap();
+        let verdict = engine
+            .evaluate(&ctx("read_record", "patient/42", &[]))
+            .unwrap();
 
         assert_eq!(verdict, PolicyVerdict::Allow);
     }
@@ -115,7 +119,9 @@ mod tests {
         "#;
 
         let engine = TomlPolicyEngine::from_toml_str(toml).unwrap();
-        let verdict = engine.evaluate(&ctx("delete_record", "patient/99", &[])).unwrap();
+        let verdict = engine
+            .evaluate(&ctx("delete_record", "patient/99", &[]))
+            .unwrap();
 
         match verdict {
             PolicyVerdict::Deny { reason } => {
@@ -124,7 +130,7 @@ mod tests {
                     "unexpected reason: {reason}"
                 );
             }
-            other => panic!("expected Deny, got {:?}", other),
+            other => panic!("expected Deny, got {other:?}"),
         }
     }
 
@@ -146,17 +152,22 @@ mod tests {
         "#;
 
         let engine = TomlPolicyEngine::from_toml_str(toml).unwrap();
-        let verdict = engine.evaluate(&ctx("prescribe_medication", "patient/7", &[])).unwrap();
+        let verdict = engine
+            .evaluate(&ctx("prescribe_medication", "patient/7", &[]))
+            .unwrap();
 
         match verdict {
-            PolicyVerdict::RequireApproval { reason, approver_role } => {
+            PolicyVerdict::RequireApproval {
+                reason,
+                approver_role,
+            } => {
                 assert!(
                     reason.contains("high-risk prescription"),
                     "unexpected reason: {reason}"
                 );
                 assert_eq!(approver_role, "attending_physician");
             }
-            other => panic!("expected RequireApproval, got {:?}", other),
+            other => panic!("expected RequireApproval, got {other:?}"),
         }
     }
 
@@ -187,21 +198,28 @@ mod tests {
 
         // Wildcard resource: any resource string should match.
         assert_eq!(
-            engine.evaluate(&ctx("read_record", "patient/1", &[])).unwrap(),
+            engine
+                .evaluate(&ctx("read_record", "patient/1", &[]))
+                .unwrap(),
             PolicyVerdict::Allow
         );
         assert_eq!(
-            engine.evaluate(&ctx("read_record", "some/other/resource", &[])).unwrap(),
+            engine
+                .evaluate(&ctx("read_record", "some/other/resource", &[]))
+                .unwrap(),
             PolicyVerdict::Allow
         );
 
         // Wildcard action: an action not matched by the first rule falls through
         // to the wildcard action rule.
-        match engine.evaluate(&ctx("update_record", "patient/1", &[])).unwrap() {
+        match engine
+            .evaluate(&ctx("update_record", "patient/1", &[]))
+            .unwrap()
+        {
             PolicyVerdict::Deny { reason } => {
                 assert!(reason.contains("write operations are not permitted"));
             }
-            other => panic!("expected Deny from wildcard action rule, got {:?}", other),
+            other => panic!("expected Deny from wildcard action rule, got {other:?}"),
         }
     }
 
@@ -229,7 +247,9 @@ mod tests {
         "#;
 
         let engine = TomlPolicyEngine::from_toml_str(toml).unwrap();
-        let verdict = engine.evaluate(&ctx("read_record", "patient/5", &[])).unwrap();
+        let verdict = engine
+            .evaluate(&ctx("read_record", "patient/5", &[]))
+            .unwrap();
 
         // The first rule matches, so we get Allow — not Deny from the second.
         assert_eq!(verdict, PolicyVerdict::Allow);
@@ -254,7 +274,9 @@ mod tests {
         let engine = TomlPolicyEngine::from_toml_str(toml).unwrap();
 
         // Agent holds no capabilities — must be denied despite the allow rule.
-        let verdict = engine.evaluate(&ctx("read_phi", "patient/33", &[])).unwrap();
+        let verdict = engine
+            .evaluate(&ctx("read_phi", "patient/33", &[]))
+            .unwrap();
 
         match verdict {
             PolicyVerdict::Deny { reason } => {
@@ -263,12 +285,13 @@ mod tests {
                     "deny reason should mention the missing capability: {reason}"
                 );
             }
-            other => panic!("expected Deny due to missing capability, got {:?}", other),
+            other => panic!("expected Deny due to missing capability, got {other:?}"),
         }
 
         // Agent holds the required capability — must now be allowed.
-        let verdict_with_cap =
-            engine.evaluate(&ctx("read_phi", "patient/33", &["phi:read"])).unwrap();
+        let verdict_with_cap = engine
+            .evaluate(&ctx("read_phi", "patient/33", &["phi:read"]))
+            .unwrap();
         assert_eq!(verdict_with_cap, PolicyVerdict::Allow);
     }
 
@@ -290,7 +313,7 @@ mod tests {
                     "expected parse error message, got: {reason}"
                 );
             }
-            other => panic!("expected ConfigError, got {:?}", other),
+            other => panic!("expected ConfigError, got {other:?}"),
         }
     }
 }

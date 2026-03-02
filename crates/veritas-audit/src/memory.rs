@@ -117,9 +117,12 @@ impl AuditWriter for InMemoryAuditWriter {
     /// Returns `Err(AuditWriteFailed)` only if the internal mutex is poisoned,
     /// which cannot happen under normal operation.
     fn write(&self, record: &StepRecord) -> VeritasResult<()> {
-        let mut state = self.state.lock().map_err(|e| VeritasError::AuditWriteFailed {
-            reason: format!("audit state lock poisoned: {}", e),
-        })?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|e| VeritasError::AuditWriteFailed {
+                reason: format!("audit state lock poisoned: {e}"),
+            })?;
 
         let prev_hash = state.last_hash.clone();
         let sequence = state.sequence;
@@ -147,9 +150,12 @@ impl AuditWriter for InMemoryAuditWriter {
     /// to disk or a database would flush/seal here; the in-memory writer has
     /// nothing to flush.
     fn finalize(&self, execution_id: &str) -> VeritasResult<()> {
-        let state = self.state.lock().map_err(|e| VeritasError::AuditWriteFailed {
-            reason: format!("audit state lock poisoned: {}", e),
-        })?;
+        let state = self
+            .state
+            .lock()
+            .map_err(|e| VeritasError::AuditWriteFailed {
+                reason: format!("audit state lock poisoned: {e}"),
+            })?;
 
         info!(
             execution_id = %execution_id,

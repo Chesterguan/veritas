@@ -23,9 +23,7 @@ pub fn check_drug_interaction(drug_a: &str, drug_b: &str) -> Value {
     let b = drug_b.to_lowercase();
 
     // Helper: order-independent pair match.
-    let is_pair = |x: &str, y: &str| -> bool {
-        (a == x && b == y) || (a == y && b == x)
-    };
+    let is_pair = |x: &str, y: &str| -> bool { (a == x && b == y) || (a == y && b == x) };
 
     let (severity, mechanism, recommendation) = if is_pair("warfarin", "aspirin") {
         (

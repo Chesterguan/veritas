@@ -4,9 +4,9 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License">
-  <img src="https://img.shields.io/badge/build-passing-green" alt="Build">
+  <img src="https://github.com/Chesterguan/veritas/actions/workflows/ci.yml/badge.svg" alt="Build">
   <img src="https://img.shields.io/badge/tests-58%20passing-green" alt="Tests">
-  <img src="https://img.shields.io/badge/rust-1.70%2B-orange" alt="Rust">
+  <img src="https://img.shields.io/badge/rust-1.74%2B-orange" alt="Rust">
 </p>
 
 <p align="center">
@@ -19,7 +19,30 @@ Lightweight, deterministic, policy-bound, auditable, and verifiable execution ru
 
 > Reference domain: Healthcare
 
-## The Idea
+## Quick Start
+
+```bash
+git clone https://github.com/Chesterguan/veritas.git
+cd veritas
+cargo test --workspace       # 58 tests, all passing
+cargo run -p demo -- run-all # run all 5 healthcare scenarios
+```
+
+<p align="center">
+  <img src="assets/demo.gif" alt="VERITAS Healthcare Demo" width="900">
+</p>
+
+Or launch the interactive TUI:
+
+```bash
+cargo run -p veritas-tui
+```
+
+The TUI lets you select scenarios, toggle patient consent and agent capabilities, and watch VERITAS enforce policy in real time.
+
+**Prerequisites:** Rust 1.74+ ([install](https://rustup.rs/))
+
+## Why VERITAS
 
 Agent runtimes like [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) and [OpenClaw](https://github.com/openclaw/openclaw) proved that AI agents can be fast, tiny, and deployable anywhere. But they were not built for environments where every action must be traceable, policy-constrained, and verifiable.
 
@@ -28,12 +51,6 @@ VERITAS does not replace them. It wraps them with trust.
 ```
 Linux Kernel        →  ZeroClaw / OpenClaw    (fast, minimal, runs anywhere)
 Red Hat Enterprise  →  VERITAS                (trusted, governed, auditable)
-```
-
-## Execution Model
-
-```
-State → Policy → Capability → Audit → Verify → Next State
 ```
 
 ## Architecture
@@ -51,17 +68,15 @@ State → Policy → Capability → Audit → Verify → Next State
 └─────────────────────────────────────────────────────┘
 ```
 
-## Core Components
+### Execution Model
 
-| Component | Purpose |
-|-----------|---------|
-| `veritas-core/` | Deterministic runtime (ZeroClaw lineage) |
-| `veritas-policy/` | Deny-by-default permission & risk engine |
-| `veritas-audit/` | Immutable, append-only execution trace |
-| `veritas-verify/` | Output validation before delivery |
-| `veritas-contracts/` | Capability / policy / audit schemas |
+Every agent action follows the same deterministic pipeline — no exceptions, no shortcuts:
 
-## Trust Boundary
+```
+State → Policy → Capability → Audit → Verify → Next State
+```
+
+### Trust Boundary
 
 | Trusted | Untrusted |
 |---------|-----------|
@@ -69,6 +84,37 @@ State → Policy → Capability → Audit → Verify → Next State
 | Policy engine | Tools |
 | Audit engine | Input data |
 | Verifier | External environment |
+
+## Core Components
+
+| Crate | Purpose | Tests |
+|-------|---------|-------|
+| [`veritas-contracts`](crates/veritas-contracts) | Shared types, traits, error types | 15 |
+| [`veritas-core`](crates/veritas-core) | Deterministic executor pipeline | 6 |
+| [`veritas-policy`](crates/veritas-policy) | TOML deny-by-default policy engine | 8 |
+| [`veritas-audit`](crates/veritas-audit) | SHA-256 hash-chained audit trail | 6 |
+| [`veritas-verify`](crates/veritas-verify) | JSON Schema + semantic rule verification | 10 |
+| [`veritas-ref-healthcare`](crates/veritas-ref-healthcare) | Healthcare reference runtime (5 scenarios) | 13 |
+
+## Healthcare Demo Scenarios
+
+| # | Scenario | What it demonstrates |
+|---|----------|---------------------|
+| 1 | **Drug Interaction Checker** | Policy Allow flow, output schema verification |
+| 2 | **Clinical Note Summarizer** | PII detection via custom verifier rule |
+| 3 | **Patient Data Query** | Capability-based access control, consent enforcement |
+| 4 | **Multi-Agent Clinical Pipeline** | 4-agent chain with independent audit trails |
+| 5 | **Prior Authorization Workflow** | RequireApproval lifecycle with physician approval |
+
+Run individually:
+
+```bash
+cargo run -p demo -- drug-interaction
+cargo run -p demo -- note-summarizer
+cargo run -p demo -- patient-query
+cargo run -p demo -- clinical-pipeline
+cargo run -p demo -- prior-auth
+```
 
 ## Design Principles
 
@@ -85,11 +131,32 @@ State → Policy → Capability → Audit → Verify → Next State
 
 > **Lightweight by conviction.** Governance must not be the reason agents become slow, heavy, or hard to build.
 
+## Project Structure
+
+```
+crates/
+  veritas-contracts/       # Shared types, traits, error types
+  veritas-core/            # Deterministic executor pipeline
+  veritas-policy/          # TOML deny-by-default policy engine
+  veritas-audit/           # SHA-256 hash-chained audit trail
+  veritas-verify/          # JSON Schema + semantic rule verification
+  veritas-ref-healthcare/  # Healthcare reference runtime (5 scenarios)
+demo/                      # CLI demo runner (clap)
+tui/                       # Interactive TUI demo (ratatui)
+docs/
+  whitepaper/              # Whitepaper v0.3 (EN, ZH, JA, FR)
+  yellowpaper/             # Yellow Paper v0.1 (EN)
+```
+
 ## Documentation
 
-See [`docs/`](./docs) for full documentation.
+| Document | Description |
+|----------|-------------|
+| [Whitepaper v0.3](docs/whitepaper/WHITEPAPER.en.md) | Vision, design philosophy, system architecture |
+| [Yellow Paper v0.1](docs/yellowpaper/YELLOWPAPER.en.md) | Formal execution semantics and specifications |
+| [docs/](docs/README.md) | Full documentation index |
 
-### Whitepaper v0.3
+### Whitepaper Translations
 
 | Language | Link |
 |----------|------|
@@ -97,38 +164,6 @@ See [`docs/`](./docs) for full documentation.
 | 简体中文 | [WHITEPAPER.zh.md](docs/whitepaper/WHITEPAPER.zh.md) |
 | 日本語 | [WHITEPAPER.ja.md](docs/whitepaper/WHITEPAPER.ja.md) |
 | Français | [WHITEPAPER.fr.md](docs/whitepaper/WHITEPAPER.fr.md) |
-
-## Quick Start
-
-### Prerequisites
-
-- Rust 1.70+ ([install](https://rustup.rs/))
-
-### Build & Test
-
-```bash
-git clone https://github.com/Chesterguan/veritas.git
-cd veritas
-cargo test --workspace       # 58 tests, all passing
-```
-
-### Run the Healthcare Demo
-
-```bash
-cargo run -p demo -- run-all
-```
-
-<p align="center">
-  <img src="assets/demo.gif" alt="VERITAS Healthcare Demo" width="900">
-</p>
-
-### Interactive TUI Demo
-
-```bash
-cargo run -p veritas-tui
-```
-
-The TUI lets you select scenarios, toggle patient consent and agent capabilities, and watch VERITAS enforce policy in real time.
 
 ## Contributing
 

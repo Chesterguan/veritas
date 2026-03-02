@@ -8,8 +8,8 @@
 //! 1. Iterate rules in declaration order.
 //! 2. For the first rule whose `action` and `resource` patterns match:
 //!    a. Verify the agent holds every capability listed in `required_capabilities`.
-//!       If any are missing → `Deny` (defense-in-depth; the `allow` verdict is
-//!       overridden by missing capabilities, not by the rule order).
+//!    If any are missing → `Deny` (defense-in-depth; the `allow` verdict is
+//!    overridden by missing capabilities, not by the rule order).
 //!    b. Convert `RuleVerdict` → `PolicyVerdict` and return.
 //! 3. If no rule matched → `Deny` with "denied by default" (deny-by-default policy).
 
@@ -46,7 +46,7 @@ impl TomlPolicyEngine {
     /// not match the expected `PolicyConfig` schema.
     pub fn from_toml_str(s: &str) -> VeritasResult<Self> {
         let config: PolicyConfig = toml::from_str(s).map_err(|e| VeritasError::ConfigError {
-            reason: format!("failed to parse policy TOML: {}", e),
+            reason: format!("failed to parse policy TOML: {e}"),
         })?;
         Ok(Self { config })
     }

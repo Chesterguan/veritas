@@ -13,7 +13,7 @@ use chrono::Utc;
 use tracing::{debug, info, warn};
 
 use veritas_contracts::{
-    agent::{AgentState, AgentInput},
+    agent::{AgentInput, AgentState},
     capability::{Capability, CapabilitySet},
     error::{VeritasError, VeritasResult},
     execution::{StepRecord, StepResult},
@@ -43,7 +43,12 @@ impl Executor {
         verifier: Box<dyn Verifier>,
         schema: OutputSchema,
     ) -> Self {
-        Self { policy, audit, verifier, schema }
+        Self {
+            policy,
+            audit,
+            verifier,
+            schema,
+        }
     }
 
     /// Execute one step of the agent's state machine.
@@ -130,7 +135,10 @@ impl Executor {
                 });
             }
 
-            PolicyVerdict::RequireApproval { reason, approver_role } => {
+            PolicyVerdict::RequireApproval {
+                reason,
+                approver_role,
+            } => {
                 info!(
                     execution_id = %execution_id,
                     step = step_num,
@@ -183,8 +191,7 @@ impl Executor {
                 // Audit the capability failure as a synthetic denial.
                 let denial_verdict = PolicyVerdict::Deny {
                     reason: format!(
-                        "capability '{}' required for action '{}' is not granted",
-                        cap_name, action
+                        "capability '{cap_name}' required for action '{action}' is not granted"
                     ),
                 };
                 let record = StepRecord {
@@ -263,10 +270,7 @@ impl Executor {
                 output,
             })
         } else {
-            Ok(StepResult::Transitioned {
-                next_state,
-                output,
-            })
+            Ok(StepResult::Transitioned { next_state, output })
         }
     }
 }
@@ -350,7 +354,10 @@ mod tests {
         }
 
         fn finalize(&self, execution_id: &str) -> VeritasResult<()> {
-            self.finalized.lock().unwrap().push(execution_id.to_string());
+            self.finalized
+                .lock()
+                .unwrap()
+                .push(execution_id.to_string());
             Ok(())
         }
     }
@@ -367,7 +374,10 @@ mod tests {
             _schema: &OutputSchema,
         ) -> VeritasResult<VerificationReport> {
             if self.pass {
-                Ok(VerificationReport { passed: true, failures: vec![] })
+                Ok(VerificationReport {
+                    passed: true,
+                    failures: vec![],
+                })
             } else {
                 Ok(VerificationReport {
                     passed: false,
@@ -424,19 +434,11 @@ mod tests {
             })
         }
 
-        fn required_capabilities(
-            &self,
-            _state: &AgentState,
-            _input: &AgentInput,
-        ) -> Vec<String> {
+        fn required_capabilities(&self, _state: &AgentState, _input: &AgentInput) -> Vec<String> {
             vec![]
         }
 
-        fn describe_action(
-            &self,
-            _state: &AgentState,
-            _input: &AgentInput,
-        ) -> (String, String) {
+        fn describe_action(&self, _state: &AgentState, _input: &AgentInput) -> (String, String) {
             ("respond".to_string(), "user".to_string())
         }
 
@@ -460,22 +462,17 @@ mod tests {
             state: &AgentState,
             _output: &AgentOutput,
         ) -> VeritasResult<AgentState> {
-            Ok(AgentState { step: state.step + 1, ..state.clone() })
+            Ok(AgentState {
+                step: state.step + 1,
+                ..state.clone()
+            })
         }
 
-        fn required_capabilities(
-            &self,
-            _state: &AgentState,
-            _input: &AgentInput,
-        ) -> Vec<String> {
+        fn required_capabilities(&self, _state: &AgentState, _input: &AgentInput) -> Vec<String> {
             vec![self.required.clone()]
         }
 
-        fn describe_action(
-            &self,
-            _state: &AgentState,
-            _input: &AgentInput,
-        ) -> (String, String) {
+        fn describe_action(&self, _state: &AgentState, _input: &AgentInput) -> (String, String) {
             ("read_phi".to_string(), "patient_record".to_string())
         }
 
@@ -499,17 +496,27 @@ mod tests {
         let audit_records = audit.records.clone();
 
         let executor = Executor::new(
-            Box::new(MockPolicy { verdict: PolicyVerdict::Deny { reason: "not allowed".to_string() } }),
+            Box::new(MockPolicy {
+                verdict: PolicyVerdict::Deny {
+                    reason: "not allowed".to_string(),
+                },
+            }),
             Box::new(audit),
             Box::new(MockVerifier { pass: true }),
             make_schema(),
         );
 
         let caps = CapabilitySet::default();
-        let result = executor.step(&agent, make_state("active"), make_input(), &caps).unwrap();
+        let result = executor
+            .step(&agent, make_state("active"), make_input(), &caps)
+            .unwrap();
 
         // Proposal must NEVER have been called.
-        assert_eq!(*propose_count.lock().unwrap(), 0, "propose() must not be called on Deny");
+        assert_eq!(
+            *propose_count.lock().unwrap(),
+            0,
+            "propose() must not be called on Deny"
+        );
 
         // Result must be Denied.
         assert!(matches!(result, StepResult::Denied { .. }));
@@ -537,26 +544,40 @@ mod tests {
         );
 
         let caps = CapabilitySet::default();
-        let result = executor.step(&agent, make_state("active"), make_input(), &caps).unwrap();
+        let result = executor
+            .step(&agent, make_state("active"), make_input(), &caps)
+            .unwrap();
 
-        assert_eq!(*propose_count.lock().unwrap(), 0, "propose() must not be called on RequireApproval");
+        assert_eq!(
+            *propose_count.lock().unwrap(),
+            0,
+            "propose() must not be called on RequireApproval"
+        );
 
         match result {
-            StepResult::AwaitingApproval { reason, approver_role, .. } => {
+            StepResult::AwaitingApproval {
+                reason,
+                approver_role,
+                ..
+            } => {
                 assert_eq!(reason, "high risk action");
                 assert_eq!(approver_role, "attending_physician");
             }
-            other => panic!("expected AwaitingApproval, got {:?}", other),
+            other => panic!("expected AwaitingApproval, got {other:?}"),
         }
     }
 
     /// A missing capability blocks the step even when policy says Allow.
     #[test]
     fn test_capability_missing_blocks() {
-        let agent = CapRequiringAgent { required: "phi:read".to_string() };
+        let agent = CapRequiringAgent {
+            required: "phi:read".to_string(),
+        };
 
         let executor = Executor::new(
-            Box::new(MockPolicy { verdict: PolicyVerdict::Allow }),
+            Box::new(MockPolicy {
+                verdict: PolicyVerdict::Allow,
+            }),
             Box::new(MockAudit::new()),
             Box::new(MockVerifier { pass: true }),
             make_schema(),
@@ -570,7 +591,7 @@ mod tests {
             Err(VeritasError::CapabilityMissing { capability, .. }) => {
                 assert_eq!(capability, "phi:read");
             }
-            other => panic!("expected CapabilityMissing, got {:?}", other),
+            other => panic!("expected CapabilityMissing, got {other:?}"),
         }
     }
 
@@ -584,14 +605,18 @@ mod tests {
         let audit_records = audit.records.clone();
 
         let executor = Executor::new(
-            Box::new(MockPolicy { verdict: PolicyVerdict::Allow }),
+            Box::new(MockPolicy {
+                verdict: PolicyVerdict::Allow,
+            }),
             Box::new(audit),
             Box::new(MockVerifier { pass: true }),
             make_schema(),
         );
 
         let caps = CapabilitySet::default();
-        let result = executor.step(&agent, make_state("active"), make_input(), &caps).unwrap();
+        let result = executor
+            .step(&agent, make_state("active"), make_input(), &caps)
+            .unwrap();
 
         // propose() must have been called exactly once.
         assert_eq!(*propose_count.lock().unwrap(), 1);
@@ -605,7 +630,7 @@ mod tests {
                 assert_eq!(next_state.phase, "next");
                 assert_eq!(output.kind, "response");
             }
-            other => panic!("expected Transitioned, got {:?}", other),
+            other => panic!("expected Transitioned, got {other:?}"),
         }
     }
 
@@ -618,26 +643,36 @@ mod tests {
         let was_finalized = audit.finalized.clone();
 
         let executor = Executor::new(
-            Box::new(MockPolicy { verdict: PolicyVerdict::Allow }),
+            Box::new(MockPolicy {
+                verdict: PolicyVerdict::Allow,
+            }),
             Box::new(audit),
             Box::new(MockVerifier { pass: true }),
             make_schema(),
         );
 
         let caps = CapabilitySet::default();
-        let result = executor.step(&agent, make_state("active"), make_input(), &caps).unwrap();
+        let result = executor
+            .step(&agent, make_state("active"), make_input(), &caps)
+            .unwrap();
 
         match result {
-            StepResult::Complete { final_state, output } => {
+            StepResult::Complete {
+                final_state,
+                output,
+            } => {
                 assert_eq!(output.kind, "response");
                 // The transitioned state has step = 1.
                 assert_eq!(final_state.step, 1);
             }
-            other => panic!("expected Complete, got {:?}", other),
+            other => panic!("expected Complete, got {other:?}"),
         }
 
         // audit.finalize() must have been called.
-        assert!(!was_finalized.lock().unwrap().is_empty(), "audit must be finalized on Complete");
+        assert!(
+            !was_finalized.lock().unwrap().is_empty(),
+            "audit must be finalized on Complete"
+        );
     }
 
     /// When the verifier returns a failing report, the step returns
@@ -648,7 +683,9 @@ mod tests {
         let propose_count = agent.propose_count.clone();
 
         let executor = Executor::new(
-            Box::new(MockPolicy { verdict: PolicyVerdict::Allow }),
+            Box::new(MockPolicy {
+                verdict: PolicyVerdict::Allow,
+            }),
             Box::new(MockAudit::new()),
             Box::new(MockVerifier { pass: false }),
             make_schema(),
@@ -662,9 +699,12 @@ mod tests {
 
         match result {
             Err(VeritasError::VerificationFailed { reason }) => {
-                assert!(reason.contains("patient_id"), "reason should mention the failed rule: {}", reason);
+                assert!(
+                    reason.contains("patient_id"),
+                    "reason should mention the failed rule: {reason}"
+                );
             }
-            other => panic!("expected VerificationFailed, got {:?}", other),
+            other => panic!("expected VerificationFailed, got {other:?}"),
         }
     }
 }

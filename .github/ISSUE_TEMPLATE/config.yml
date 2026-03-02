@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/Chesterguan/veritas/tree/main/docs
+    about: Read the whitepaper and technical documentation
+  - name: Good First Issues
+    url: https://github.com/Chesterguan/veritas/labels/good%20first%20issue
+    about: Browse beginner-friendly issues to get started

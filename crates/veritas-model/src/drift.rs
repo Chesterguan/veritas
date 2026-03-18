@@ -70,7 +70,15 @@ pub struct InMemoryDriftMonitor {
 
 impl InMemoryDriftMonitor {
     /// Construct a monitor with the supplied configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `config.window_size` is 0.
     pub fn new(config: DriftConfig) -> Self {
+        assert!(
+            config.window_size > 0,
+            "DriftConfig::window_size must be > 0"
+        );
         Self {
             config,
             records: Mutex::new(HashMap::new()),
@@ -264,7 +272,19 @@ mod tests {
         assert_eq!(m.check_drift("model-e"), DriftStatus::Stable);
     }
 
-    // ── 6: unknown model returns Stable ──────────────────────────────────────
+    // ── 6: zero window_size panics at construction ──────────────────────────
+
+    #[test]
+    #[should_panic(expected = "window_size must be > 0")]
+    fn zero_window_size_panics() {
+        let cfg = DriftConfig {
+            window_size: 0,
+            ..config()
+        };
+        InMemoryDriftMonitor::new(cfg);
+    }
+
+    // ── 7: unknown model returns Stable ──────────────────────────────────────
 
     #[test]
     fn unknown_model_returns_stable() {

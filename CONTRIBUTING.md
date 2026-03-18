@@ -1,6 +1,6 @@
 # Contributing to VERITAS
 
-> Last updated: 2026-03-02
+> Last updated: 2026-03-18
 
 Thank you for your interest in contributing to VERITAS. This guide will help you get started.
 
@@ -8,7 +8,7 @@ Thank you for your interest in contributing to VERITAS. This guide will help you
 
 ### Prerequisites
 
-- Rust 1.74+ (`rustup` recommended)
+- Rust 1.78+ (`rustup` recommended)
 - Git
 
 ### Getting Started

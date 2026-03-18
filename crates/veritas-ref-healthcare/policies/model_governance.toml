@@ -10,7 +10,7 @@
 # is Experimental, Pending, Revoked, or unknown will lack that capability and
 # hit the deny rules below.
 #
-# Updated: 2026-03-13
+# Updated: 2026-03-18
 
 # ── Scenario 6: Radiology model inference ─────────────────────────────────────
 

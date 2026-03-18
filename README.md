@@ -5,8 +5,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License">
   <img src="https://github.com/Chesterguan/veritas/actions/workflows/ci.yml/badge.svg" alt="Build">
-  <img src="https://img.shields.io/badge/tests-72%2B%20passing-green" alt="Tests">
-  <img src="https://img.shields.io/badge/rust-1.74%2B-orange" alt="Rust">
+  <img src="https://img.shields.io/badge/tests-109%20passing-green" alt="Tests">
+  <img src="https://img.shields.io/badge/rust-1.78%2B-orange" alt="Rust">
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@ Lightweight, deterministic, policy-bound, auditable, and verifiable execution ru
 ```bash
 git clone https://github.com/Chesterguan/veritas.git
 cd veritas
-cargo test --workspace       # 72+ tests, all passing
+cargo test --workspace       # 109 tests, all passing
 cargo run -p demo -- run-all # run all 7 healthcare scenarios
 ```
 
@@ -38,9 +38,9 @@ Or launch the interactive TUI:
 cargo run -p veritas-tui
 ```
 
-The TUI lets you select scenarios (1, 4, 5, 6, 7), toggle patient consent and agent capabilities, and watch VERITAS enforce policy in real time.
+The TUI lets you select scenarios (1, 4, 5, 6, 7) and watch VERITAS enforce policy, model governance, and drift detection in real time.
 
-**Prerequisites:** Rust 1.74+ ([install](https://rustup.rs/))
+**Prerequisites:** Rust 1.78+ ([install](https://rustup.rs/))
 
 ## Why VERITAS
 
@@ -89,13 +89,13 @@ State → Policy → Capability → Audit → Verify → Next State
 
 | Crate | Purpose | Tests |
 |-------|---------|-------|
-| [`veritas-contracts`](crates/veritas-contracts) | Shared types, traits, error types | 15 |
+| [`veritas-contracts`](crates/veritas-contracts) | Shared types, traits, error types | 27 |
 | [`veritas-core`](crates/veritas-core) | Deterministic executor pipeline | 6 |
 | [`veritas-policy`](crates/veritas-policy) | TOML deny-by-default policy engine | 8 |
 | [`veritas-audit`](crates/veritas-audit) | SHA-256 hash-chained audit trail | 6 |
 | [`veritas-verify`](crates/veritas-verify) | JSON Schema + semantic rule verification | 10 |
-| [`veritas-model`](crates/veritas-model) | Model registry, drift detection, model governance | — |
-| [`veritas-ref-healthcare`](crates/veritas-ref-healthcare) | Healthcare reference runtime (7 scenarios) | 13+ |
+| [`veritas-model`](crates/veritas-model) | Model registry, drift detection, model governance | 25 |
+| [`veritas-ref-healthcare`](crates/veritas-ref-healthcare) | Healthcare reference runtime (7 scenarios) | 27 |
 
 ## Healthcare Demo Scenarios
 
@@ -117,8 +117,8 @@ cargo run -p demo -- note-summarizer
 cargo run -p demo -- patient-query
 cargo run -p demo -- clinical-pipeline
 cargo run -p demo -- prior-auth
-cargo run -p demo -- radiology-governance
-cargo run -p demo -- sepsis-drift
+cargo run -p demo -- radiology-model
+cargo run -p demo -- sepsis-model
 ```
 
 ## Design Principles

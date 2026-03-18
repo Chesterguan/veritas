@@ -9,8 +9,16 @@ pub mod agent;
 pub mod capability;
 pub mod error;
 pub mod execution;
+pub mod model;
 pub mod policy;
 pub mod verify;
+
+// Re-export the model capability surface so downstream crates can write
+// `use veritas_contracts::ModelCapability` without the full module path.
+pub use model::{
+    ApprovalStatus, DriftMonitor, DriftStatus, ModelCapability, ModelDescriptor, ModelModality,
+    ModelProvenance, ModelResult, TokenUsage,
+};
 
 #[cfg(test)]
 mod tests {

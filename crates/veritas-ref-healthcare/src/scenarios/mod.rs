@@ -9,3 +9,5 @@ pub mod drug_interaction;
 pub mod note_summarizer;
 pub mod patient_query;
 pub mod prior_auth;
+pub mod radiology_model;
+pub mod sepsis_model;

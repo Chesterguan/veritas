@@ -7,6 +7,7 @@ members = [
     "crates/veritas-audit",
     "crates/veritas-verify",
     "crates/veritas-ref-healthcare",
+    "crates/veritas-model",
     "demo",
     "tui",
 ]
@@ -29,4 +30,5 @@ veritas-policy = { path = "crates/veritas-policy" }
 veritas-audit = { path = "crates/veritas-audit" }
 veritas-verify = { path = "crates/veritas-verify" }
 veritas-ref-healthcare = { path = "crates/veritas-ref-healthcare" }
+veritas-model = { path = "crates/veritas-model" }
 jsonschema = "0.28"

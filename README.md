@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License">
   <img src="https://github.com/Chesterguan/veritas/actions/workflows/ci.yml/badge.svg" alt="Build">
-  <img src="https://img.shields.io/badge/tests-58%20passing-green" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-72%2B%20passing-green" alt="Tests">
   <img src="https://img.shields.io/badge/rust-1.74%2B-orange" alt="Rust">
 </p>
 
@@ -24,8 +24,8 @@ Lightweight, deterministic, policy-bound, auditable, and verifiable execution ru
 ```bash
 git clone https://github.com/Chesterguan/veritas.git
 cd veritas
-cargo test --workspace       # 58 tests, all passing
-cargo run -p demo -- run-all # run all 5 healthcare scenarios
+cargo test --workspace       # 72+ tests, all passing
+cargo run -p demo -- run-all # run all 7 healthcare scenarios
 ```
 
 <p align="center">
@@ -38,7 +38,7 @@ Or launch the interactive TUI:
 cargo run -p veritas-tui
 ```
 
-The TUI lets you select scenarios, toggle patient consent and agent capabilities, and watch VERITAS enforce policy in real time.
+The TUI lets you select scenarios (1, 4, 5, 6, 7), toggle patient consent and agent capabilities, and watch VERITAS enforce policy in real time.
 
 **Prerequisites:** Rust 1.74+ ([install](https://rustup.rs/))
 
@@ -94,7 +94,8 @@ State → Policy → Capability → Audit → Verify → Next State
 | [`veritas-policy`](crates/veritas-policy) | TOML deny-by-default policy engine | 8 |
 | [`veritas-audit`](crates/veritas-audit) | SHA-256 hash-chained audit trail | 6 |
 | [`veritas-verify`](crates/veritas-verify) | JSON Schema + semantic rule verification | 10 |
-| [`veritas-ref-healthcare`](crates/veritas-ref-healthcare) | Healthcare reference runtime (5 scenarios) | 13 |
+| [`veritas-model`](crates/veritas-model) | Model registry, drift detection, model governance | — |
+| [`veritas-ref-healthcare`](crates/veritas-ref-healthcare) | Healthcare reference runtime (7 scenarios) | 13+ |
 
 ## Healthcare Demo Scenarios
 
@@ -105,6 +106,8 @@ State → Policy → Capability → Audit → Verify → Next State
 | 3 | **Patient Data Query** | Capability-based access control, consent enforcement |
 | 4 | **Multi-Agent Clinical Pipeline** | 4-agent chain with independent audit trails |
 | 5 | **Prior Authorization Workflow** | RequireApproval lifecycle with physician approval |
+| 6 | **Radiology AI Model Governance** | ImageToLabel model with approval gate and registry |
+| 7 | **Sepsis Risk Model with Drift** | TabularToScore model with drift detection and alerting |
 
 Run individually:
 
@@ -114,6 +117,8 @@ cargo run -p demo -- note-summarizer
 cargo run -p demo -- patient-query
 cargo run -p demo -- clinical-pipeline
 cargo run -p demo -- prior-auth
+cargo run -p demo -- radiology-governance
+cargo run -p demo -- sepsis-drift
 ```
 
 ## Design Principles
@@ -140,7 +145,8 @@ crates/
   veritas-policy/          # TOML deny-by-default policy engine
   veritas-audit/           # SHA-256 hash-chained audit trail
   veritas-verify/          # JSON Schema + semantic rule verification
-  veritas-ref-healthcare/  # Healthcare reference runtime (5 scenarios)
+  veritas-model/           # Model registry, drift detection, model governance
+  veritas-ref-healthcare/  # Healthcare reference runtime (7 scenarios)
 demo/                      # CLI demo runner (clap)
 tui/                       # Interactive TUI demo (ratatui)
 docs/

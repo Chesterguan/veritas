@@ -1,0 +1,10 @@
+[package]
+name = "veritas-model"
+version = "0.1.0"
+edition = "2021"
+description = "In-memory model registry for the VERITAS runtime — tracks approved models and bridges them into the capability system"
+
+[dependencies]
+veritas-contracts.workspace = true
+serde.workspace = true
+serde_json.workspace = true

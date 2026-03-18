@@ -10,6 +10,7 @@ veritas-core.workspace = true
 veritas-policy.workspace = true
 veritas-audit.workspace = true
 veritas-verify.workspace = true
+veritas-model.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true

@@ -1,6 +1,6 @@
 # VERITAS — Project Instructions
 
-> Last updated: 2026-02-18
+> Last updated: 2026-03-13
 
 ## Overview
 
@@ -48,7 +48,9 @@ crates/
   veritas-policy/          # TOML deny-by-default policy engine (8 tests)
   veritas-audit/           # SHA-256 hash-chained audit trail (6 tests)
   veritas-verify/          # JSON Schema + semantic rule verification (10 tests)
-  veritas-ref-healthcare/  # Healthcare reference runtime (5 scenarios, 13 tests)
+  veritas-model/           # Model registry, drift detection, model governance
+  veritas-ref-healthcare/  # Healthcare reference runtime (7 scenarios, 13+ tests)
+
 demo/                      # CLI demo runner (clap)
 tui/                       # Interactive TUI demo (ratatui 0.29 + crossterm 0.28)
 assets/                    # Logo and demo GIF
@@ -64,6 +66,7 @@ docs/                      # Whitepaper v0.3 (EN, ZH, JA, FR)
 | `veritas-policy` | Deny-by-default permission & risk engine |
 | `veritas-audit` | Immutable, append-only execution trace |
 | `veritas-verify` | Output validation before delivery |
+| `veritas-model` | Model registry, drift detection, model governance |
 
 ## Execution Model
 

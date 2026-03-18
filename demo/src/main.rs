@@ -11,19 +11,22 @@
 //!   cargo run -p demo -- patient-query
 //!   cargo run -p demo -- clinical-pipeline
 //!   cargo run -p demo -- prior-auth
+//!   cargo run -p demo -- radiology-model
+//!   cargo run -p demo -- sepsis-model
 
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
 use veritas_ref_healthcare::scenarios::{
     clinical_pipeline, drug_interaction, note_summarizer, patient_query, prior_auth,
+    radiology_model, sepsis_model,
 };
 
 // ── CLI definition ────────────────────────────────────────────────────────────
 
 /// VERITAS — Policy-bound AI runtime healthcare demo.
 ///
-/// Each subcommand runs one or all of the five clinical AI scenarios,
+/// Each subcommand runs one or all of the clinical AI scenarios,
 /// demonstrating VERITAS's policy, capability, and verification enforcement.
 #[derive(Parser)]
 #[command(
@@ -36,7 +39,9 @@ use veritas_ref_healthcare::scenarios::{
                   2. Clinical Note Summarizer     — PII custom verifier rule\n\
                   3. Patient Data Query           — Allow / CapabilityMissing / Deny\n\
                   4. Clinical Decision Pipeline   — 4-agent chain with output handoff\n\
-                  5. Prior Authorization Workflow — RequireApproval to completion"
+                  5. Prior Authorization Workflow — RequireApproval to completion\n\
+                  6. Radiology AI Model Governance — ModelRegistry + drift detection\n\
+                  7. Sepsis Risk Model with Drift  — Warning → Drifted → auto-revoke"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -45,7 +50,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Run all five healthcare scenarios in sequence.
+    /// Run all seven healthcare scenarios in sequence.
     RunAll,
     /// Scenario 1: Drug Interaction Checker (capability-gated DB query).
     DrugInteraction,
@@ -57,6 +62,10 @@ enum Command {
     ClinicalPipeline,
     /// Scenario 5: Prior Authorization Workflow (RequireApproval → approval → submit).
     PriorAuth,
+    /// Scenario 6: Radiology AI Model Governance (ModelRegistry + drift detection).
+    RadiologyModel,
+    /// Scenario 7: Sepsis Risk Model with Drift (Warning → Drifted → auto-revoke).
+    SepsisModel,
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -82,6 +91,8 @@ fn main() {
         Command::PatientQuery => run_patient_query(),
         Command::ClinicalPipeline => run_clinical_pipeline(),
         Command::PriorAuth => run_prior_auth(),
+        Command::RadiologyModel => run_radiology_model(),
+        Command::SepsisModel => run_sepsis_model(),
     };
 
     match result {
@@ -103,6 +114,8 @@ fn run_all() -> veritas_contracts::error::VeritasResult<()> {
     run_patient_query()?;
     run_clinical_pipeline()?;
     run_prior_auth()?;
+    run_radiology_model()?;
+    run_sepsis_model()?;
     Ok(())
 }
 
@@ -124,6 +137,14 @@ fn run_clinical_pipeline() -> veritas_contracts::error::VeritasResult<()> {
 
 fn run_prior_auth() -> veritas_contracts::error::VeritasResult<()> {
     prior_auth::run_scenario()
+}
+
+fn run_radiology_model() -> veritas_contracts::error::VeritasResult<()> {
+    radiology_model::run_scenario()
+}
+
+fn run_sepsis_model() -> veritas_contracts::error::VeritasResult<()> {
+    sepsis_model::run_scenario()
 }
 
 // ── Banner ────────────────────────────────────────────────────────────────────

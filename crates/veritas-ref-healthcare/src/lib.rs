@@ -16,6 +16,12 @@
 //! 5. **Prior Authorization Workflow** — `RequireApproval` verdict exercised to
 //!    completion: physician approval simulated, then two sub-cases (PA approved
 //!    vs. denied at insurance eligibility).
+//! 6. **Radiology AI Model Governance** — `ModelRegistry` + `model:approved`
+//!    capability gate: approved model runs, experimental model blocked, drift
+//!    detection auto-revokes the model.
+//! 7. **Sepsis Risk Model with Drift** — `TabularToScore` model governance:
+//!    stable operation, Warning phase, Drifted auto-revocation, revoked model
+//!    blocked by policy.
 //!
 //! All data is hardcoded and fictional. No external API calls are made.
 

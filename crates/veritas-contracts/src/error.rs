@@ -37,6 +37,10 @@ pub enum VeritasError {
     /// A JSON Schema validation check failed outside of the normal verification path.
     #[error("schema validation error: {reason}")]
     SchemaValidation { reason: String },
+
+    /// A caller supplied an invalid argument (e.g. duplicate model ID, unknown reference).
+    #[error("invalid input: {reason}")]
+    InvalidInput { reason: String },
 }
 
 /// Convenience alias used throughout the VERITAS crates.

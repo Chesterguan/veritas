@@ -1,0 +1,53 @@
+# Model governance policy
+#
+# Rules are evaluated in declaration order — the first matching rule wins.
+# This policy covers Scenarios 6 and 7:
+#   6. Radiology AI Model Governance (ImageToLabel, chest X-ray)
+#   7. Sepsis Risk Model with Drift (TabularToScore)
+#
+# The "model:approved" capability is granted by ModelRegistry::capabilities_for
+# only when the registered model has ApprovalStatus::Approved.  Any model that
+# is Experimental, Pending, Revoked, or unknown will lack that capability and
+# hit the deny rules below.
+#
+# Updated: 2026-03-13
+
+# ── Scenario 6: Radiology model inference ─────────────────────────────────────
+
+# Allow an approved radiology model to run clinical inference.
+[[rules]]
+id = "allow-radiology-inference-approved"
+description = "Approved radiology models may run clinical inference when they hold model:approved"
+action = "run-inference"
+resource = "radiology-model"
+required_capabilities = ["model:approved", "radiology.read"]
+verdict = "allow"
+
+# Block unapproved / experimental radiology models before any inference runs.
+[[rules]]
+id = "deny-radiology-inference-unapproved"
+description = "Unapproved radiology models are unconditionally blocked from clinical inference"
+action = "run-inference"
+resource = "radiology-model-unapproved"
+verdict = "deny"
+deny_reason = "model not approved for clinical use: FDA 510(k) clearance required"
+
+# ── Scenario 7: Sepsis risk scoring ───────────────────────────────────────────
+
+# Allow an approved sepsis risk model to score patient vitals.
+[[rules]]
+id = "allow-sepsis-scoring-approved"
+description = "Approved sepsis risk model may score patient vitals when it holds model:approved"
+action = "score-risk"
+resource = "sepsis-model"
+required_capabilities = ["model:approved", "patient-vitals.read"]
+verdict = "allow"
+
+# Block revoked / drifted sepsis model.
+[[rules]]
+id = "deny-sepsis-scoring-revoked"
+description = "Revoked or unapproved sepsis model is blocked from scoring"
+action = "score-risk"
+resource = "sepsis-model-revoked"
+verdict = "deny"
+deny_reason = "model has been revoked: drift detected, human review required before re-activation"

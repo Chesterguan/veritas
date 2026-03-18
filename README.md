@@ -55,18 +55,9 @@ Red Hat Enterprise  →  VERITAS                (trusted, governed, auditable)
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│              Application / Agent Code               │
-│         (LangGraph, CrewAI, OpenClaw, etc.)         │
-├─────────────────────────────────────────────────────┤
-│                    VERITAS                           │
-│   Policy Engine │ Audit Trail │ Verifier │ Caps     │
-├─────────────────────────────────────────────────────┤
-│              Agent Runtime Kernel                    │
-│            (ZeroClaw or equivalent)                  │
-└─────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="assets/arch.jpg" alt="VERITAS Architecture" width="900">
+</p>
 
 ### Execution Model
 

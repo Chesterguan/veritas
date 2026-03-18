@@ -25,12 +25,12 @@ use serde_json::json;
 
 use veritas_audit::InMemoryAuditWriter;
 use veritas_contracts::{
-    ApprovalStatus, DriftMonitor, ModelModality, ModelProvenance,
     agent::{AgentId, AgentInput, AgentOutput, AgentState, ExecutionId},
     capability::{Capability, CapabilitySet},
     error::VeritasResult,
     execution::{StepRecord, StepResult},
     verify::{OutputSchema, VerificationRule, VerificationRuleType},
+    ApprovalStatus, DriftMonitor, ModelModality, ModelProvenance,
 };
 use veritas_core::{
     executor::Executor,
@@ -284,7 +284,11 @@ fn run_sub_case_a() -> VeritasResult<()> {
     let log = audit.export_log();
     println!(
         "  Audit chain:     {} ({} event(s))",
-        if audit.verify_integrity() { "VERIFIED" } else { "FAILED" },
+        if audit.verify_integrity() {
+            "VERIFIED"
+        } else {
+            "FAILED"
+        },
         log.events.len()
     );
     println!();
@@ -364,7 +368,11 @@ fn run_sub_case_b() -> VeritasResult<()> {
     let log = audit.export_log();
     println!(
         "  Audit chain:     {} ({} event(s) — denial recorded)",
-        if audit.verify_integrity() { "VERIFIED" } else { "FAILED" },
+        if audit.verify_integrity() {
+            "VERIFIED"
+        } else {
+            "FAILED"
+        },
         log.events.len()
     );
     println!();
@@ -446,8 +454,8 @@ fn run_sub_case_c() -> VeritasResult<()> {
 mod tests {
     use super::*;
     use veritas_contracts::{
-        DriftMonitor, DriftStatus,
         policy::{PolicyContext, PolicyVerdict},
+        DriftMonitor, DriftStatus,
     };
     use veritas_core::traits::PolicyEngine;
 
@@ -543,7 +551,9 @@ mod tests {
                 .unwrap();
         }
 
-        let status = registry.check_and_update("chest-xray-v3.2", &monitor).unwrap();
+        let status = registry
+            .check_and_update("chest-xray-v3.2", &monitor)
+            .unwrap();
 
         assert!(
             matches!(status, DriftStatus::Drifted { .. }),
@@ -574,7 +584,9 @@ mod tests {
                 .unwrap();
         }
 
-        let status = registry.check_and_update("chest-xray-v3.2", &monitor).unwrap();
+        let status = registry
+            .check_and_update("chest-xray-v3.2", &monitor)
+            .unwrap();
 
         assert_eq!(status, DriftStatus::Stable);
         assert!(

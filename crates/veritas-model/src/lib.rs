@@ -44,8 +44,8 @@ pub use drift::{DriftConfig, InMemoryDriftMonitor};
 use std::collections::HashMap;
 
 use veritas_contracts::{
-    ApprovalStatus, DriftMonitor, DriftStatus, ModelDescriptor, ModelModality, ModelProvenance,
     error::{VeritasError, VeritasResult},
+    ApprovalStatus, DriftMonitor, DriftStatus, ModelDescriptor, ModelModality, ModelProvenance,
 };
 
 // ── RegisteredModel ───────────────────────────────────────────────────────────
@@ -159,11 +159,12 @@ impl ModelRegistry {
     ///
     /// Returns `VeritasError::InvalidInput` if the model is not registered.
     pub fn revoke(&mut self, model_id: &str, reason: &str) -> VeritasResult<()> {
-        let model = self.models.get_mut(model_id).ok_or_else(|| {
-            VeritasError::InvalidInput {
+        let model = self
+            .models
+            .get_mut(model_id)
+            .ok_or_else(|| VeritasError::InvalidInput {
                 reason: format!("cannot revoke unknown model '{model_id}'"),
-            }
-        })?;
+            })?;
         model.provenance.approval_status = ApprovalStatus::Revoked {
             reason: reason.to_string(),
         };
@@ -202,9 +203,7 @@ impl ModelRegistry {
         // Verify model exists before consulting the monitor.
         if !self.models.contains_key(model_id) {
             return Err(VeritasError::InvalidInput {
-                reason: format!(
-                    "cannot check drift for unknown model '{model_id}'"
-                ),
+                reason: format!("cannot check drift for unknown model '{model_id}'"),
             });
         }
 
@@ -312,7 +311,11 @@ mod tests {
     #[test]
     fn register_duplicate_model_id_fails() {
         let mut registry = ModelRegistry::new();
-        let model = make_model("chest-xray-v3.2", ModelModality::ImageToLabel, ApprovalStatus::Approved);
+        let model = make_model(
+            "chest-xray-v3.2",
+            ModelModality::ImageToLabel,
+            ApprovalStatus::Approved,
+        );
 
         registry.register(model.clone()).unwrap();
         let result = registry.register(model);
@@ -331,7 +334,11 @@ mod tests {
     fn is_approved_returns_true_for_approved() {
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("m1", ModelModality::TextToText, ApprovalStatus::Approved))
+            .register(make_model(
+                "m1",
+                ModelModality::TextToText,
+                ApprovalStatus::Approved,
+            ))
             .unwrap();
         assert!(registry.is_approved("m1"));
     }
@@ -340,7 +347,11 @@ mod tests {
     fn is_approved_returns_false_for_pending() {
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("m2", ModelModality::TextToText, ApprovalStatus::Pending))
+            .register(make_model(
+                "m2",
+                ModelModality::TextToText,
+                ApprovalStatus::Pending,
+            ))
             .unwrap();
         assert!(!registry.is_approved("m2"));
     }
@@ -349,7 +360,11 @@ mod tests {
     fn is_approved_returns_false_for_experimental() {
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("m3", ModelModality::TextToText, ApprovalStatus::Experimental))
+            .register(make_model(
+                "m3",
+                ModelModality::TextToText,
+                ApprovalStatus::Experimental,
+            ))
             .unwrap();
         assert!(!registry.is_approved("m3"));
     }
@@ -381,16 +396,26 @@ mod tests {
     fn revoke_approved_model_makes_is_approved_false() {
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("chest-xray-v3.2", ModelModality::ImageToLabel, ApprovalStatus::Approved))
+            .register(make_model(
+                "chest-xray-v3.2",
+                ModelModality::ImageToLabel,
+                ApprovalStatus::Approved,
+            ))
             .unwrap();
 
-        assert!(registry.is_approved("chest-xray-v3.2"), "should be approved before revocation");
+        assert!(
+            registry.is_approved("chest-xray-v3.2"),
+            "should be approved before revocation"
+        );
 
         registry
             .revoke("chest-xray-v3.2", "safety recall issued by manufacturer")
             .unwrap();
 
-        assert!(!registry.is_approved("chest-xray-v3.2"), "must not be approved after revocation");
+        assert!(
+            !registry.is_approved("chest-xray-v3.2"),
+            "must not be approved after revocation"
+        );
 
         // Verify the revocation reason is persisted in the provenance.
         let model = registry.get("chest-xray-v3.2").unwrap();
@@ -408,24 +433,43 @@ mod tests {
     fn by_modality_returns_only_matching_models() {
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("text-a", ModelModality::TextToText, ApprovalStatus::Approved))
+            .register(make_model(
+                "text-a",
+                ModelModality::TextToText,
+                ApprovalStatus::Approved,
+            ))
             .unwrap();
         registry
-            .register(make_model("text-b", ModelModality::TextToText, ApprovalStatus::Pending))
+            .register(make_model(
+                "text-b",
+                ModelModality::TextToText,
+                ApprovalStatus::Pending,
+            ))
             .unwrap();
         registry
-            .register(make_model("image-a", ModelModality::ImageToLabel, ApprovalStatus::Approved))
+            .register(make_model(
+                "image-a",
+                ModelModality::ImageToLabel,
+                ApprovalStatus::Approved,
+            ))
             .unwrap();
 
         let text_models = registry.by_modality(&ModelModality::TextToText);
         assert_eq!(text_models.len(), 2, "should return both TextToText models");
 
         let image_models = registry.by_modality(&ModelModality::ImageToLabel);
-        assert_eq!(image_models.len(), 1, "should return only the ImageToLabel model");
+        assert_eq!(
+            image_models.len(),
+            1,
+            "should return only the ImageToLabel model"
+        );
         assert_eq!(image_models[0].model_id, "image-a");
 
         let tabular_models = registry.by_modality(&ModelModality::TabularToScore);
-        assert!(tabular_models.is_empty(), "no TabularToScore models registered");
+        assert!(
+            tabular_models.is_empty(),
+            "no TabularToScore models registered"
+        );
     }
 
     // ── 6: capabilities_for returns correct strings ───────────────────────────
@@ -434,7 +478,11 @@ mod tests {
     fn capabilities_for_approved_includes_model_approved() {
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("chest-xray-v3.2", ModelModality::ImageToLabel, ApprovalStatus::Approved))
+            .register(make_model(
+                "chest-xray-v3.2",
+                ModelModality::ImageToLabel,
+                ApprovalStatus::Approved,
+            ))
             .unwrap();
 
         let caps = registry.capabilities_for("chest-xray-v3.2");
@@ -454,11 +502,13 @@ mod tests {
     fn capabilities_for_revoked_omits_model_approved() {
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("chest-xray-v3.2", ModelModality::ImageToLabel, ApprovalStatus::Approved))
+            .register(make_model(
+                "chest-xray-v3.2",
+                ModelModality::ImageToLabel,
+                ApprovalStatus::Approved,
+            ))
             .unwrap();
-        registry
-            .revoke("chest-xray-v3.2", "safety recall")
-            .unwrap();
+        registry.revoke("chest-xray-v3.2", "safety recall").unwrap();
 
         let caps = registry.capabilities_for("chest-xray-v3.2");
 
@@ -477,7 +527,11 @@ mod tests {
     fn capabilities_for_pending_omits_model_approved() {
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("pending-model", ModelModality::TextToText, ApprovalStatus::Pending))
+            .register(make_model(
+                "pending-model",
+                ModelModality::TextToText,
+                ApprovalStatus::Pending,
+            ))
             .unwrap();
 
         let caps = registry.capabilities_for("pending-model");
@@ -523,17 +577,25 @@ mod tests {
         // Register an approved model.
         let mut registry = ModelRegistry::new();
         registry
-            .register(make_model("drift-model", ModelModality::TextToText, ApprovalStatus::Approved))
+            .register(make_model(
+                "drift-model",
+                ModelModality::TextToText,
+                ApprovalStatus::Approved,
+            ))
             .unwrap();
         assert!(registry.is_approved("drift-model"));
 
         // Establish baseline at 0.90.
         for _ in 0..5 {
-            monitor.record("drift-model", &serde_json::json!({ "confidence": 0.90 })).unwrap();
+            monitor
+                .record("drift-model", &serde_json::json!({ "confidence": 0.90 }))
+                .unwrap();
         }
         // Drop confidence to 0.60 (drop = 0.30 > drift_threshold of 0.20).
         for _ in 0..5 {
-            monitor.record("drift-model", &serde_json::json!({ "confidence": 0.60 })).unwrap();
+            monitor
+                .record("drift-model", &serde_json::json!({ "confidence": 0.60 }))
+                .unwrap();
         }
 
         let status = registry.check_and_update("drift-model", &monitor).unwrap();
@@ -544,10 +606,21 @@ mod tests {
             "expected Drifted, got {status:?}"
         );
         // Model must have been revoked.
-        assert!(!registry.is_approved("drift-model"), "drifted model must be auto-revoked");
-        match &registry.get("drift-model").unwrap().provenance.approval_status {
+        assert!(
+            !registry.is_approved("drift-model"),
+            "drifted model must be auto-revoked"
+        );
+        match &registry
+            .get("drift-model")
+            .unwrap()
+            .provenance
+            .approval_status
+        {
             ApprovalStatus::Revoked { reason } => {
-                assert!(reason.contains("drift"), "revocation reason must mention drift");
+                assert!(
+                    reason.contains("drift"),
+                    "revocation reason must mention drift"
+                );
             }
             other => panic!("expected Revoked, got {other:?}"),
         }
@@ -573,10 +646,18 @@ mod tests {
         assert!(registry.list().is_empty());
 
         registry
-            .register(make_model("alpha", ModelModality::TextToText, ApprovalStatus::Approved))
+            .register(make_model(
+                "alpha",
+                ModelModality::TextToText,
+                ApprovalStatus::Approved,
+            ))
             .unwrap();
         registry
-            .register(make_model("beta", ModelModality::ImageToText, ApprovalStatus::Pending))
+            .register(make_model(
+                "beta",
+                ModelModality::ImageToText,
+                ApprovalStatus::Pending,
+            ))
             .unwrap();
 
         let ids: std::collections::HashSet<&str> = registry.list().into_iter().collect();

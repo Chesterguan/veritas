@@ -19,12 +19,12 @@ use serde_json::json;
 
 use veritas_audit::InMemoryAuditWriter;
 use veritas_contracts::{
-    ApprovalStatus, DriftMonitor, ModelModality, ModelProvenance,
     agent::{AgentId, AgentInput, AgentOutput, AgentState, ExecutionId},
     capability::{Capability, CapabilitySet},
     error::VeritasResult,
     execution::{StepRecord, StepResult},
     verify::{OutputSchema, VerificationRule, VerificationRuleType},
+    ApprovalStatus, DriftMonitor, ModelModality, ModelProvenance,
 };
 use veritas_core::{
     executor::Executor,
@@ -77,7 +77,10 @@ impl Agent for SepsisRiskAgent {
     }
 
     fn required_capabilities(&self, _state: &AgentState, _input: &AgentInput) -> Vec<String> {
-        vec!["model:approved".to_string(), "patient-vitals.read".to_string()]
+        vec![
+            "model:approved".to_string(),
+            "patient-vitals.read".to_string(),
+        ]
     }
 
     fn describe_action(&self, _state: &AgentState, _input: &AgentInput) -> (String, String) {
@@ -111,7 +114,10 @@ impl Agent for SepsisRiskAgentRevoked {
     }
 
     fn required_capabilities(&self, _state: &AgentState, _input: &AgentInput) -> Vec<String> {
-        vec!["model:approved".to_string(), "patient-vitals.read".to_string()]
+        vec![
+            "model:approved".to_string(),
+            "patient-vitals.read".to_string(),
+        ]
     }
 
     fn describe_action(&self, _state: &AgentState, _input: &AgentInput) -> (String, String) {
@@ -294,9 +300,7 @@ fn run_sub_case_a() -> VeritasResult<()> {
     println!();
 
     let status = registry.check_and_update("sepsis-risk-v2.1", &monitor)?;
-    println!(
-        "  Drift check after 5 stable invocations: {status:?}"
-    );
+    println!("  Drift check after 5 stable invocations: {status:?}");
     println!(
         "  Model still approved: {}",
         registry.is_approved("sepsis-risk-v2.1")
@@ -422,7 +426,11 @@ fn run_sub_case_b() -> VeritasResult<()> {
         let log = audit.export_log();
         println!(
             "    Audit chain:     {} ({} event(s))",
-            if audit.verify_integrity() { "VERIFIED" } else { "FAILED" },
+            if audit.verify_integrity() {
+                "VERIFIED"
+            } else {
+                "FAILED"
+            },
             log.events.len()
         );
     }
@@ -440,8 +448,8 @@ fn run_sub_case_b() -> VeritasResult<()> {
 mod tests {
     use super::*;
     use veritas_contracts::{
-        DriftStatus,
         policy::{PolicyContext, PolicyVerdict},
+        DriftStatus,
     };
     use veritas_core::traits::PolicyEngine;
 
@@ -473,7 +481,11 @@ mod tests {
     #[test]
     fn test_revoked_sepsis_model_policy_deny() {
         let policy = TomlPolicyEngine::from_toml_str(MODEL_GOVERNANCE_POLICY).unwrap();
-        let ctx = make_policy_ctx("score-risk", "sepsis-model-revoked", &["patient-vitals.read"]);
+        let ctx = make_policy_ctx(
+            "score-risk",
+            "sepsis-model-revoked",
+            &["patient-vitals.read"],
+        );
         match policy.evaluate(&ctx).unwrap() {
             PolicyVerdict::Deny { reason } => {
                 assert!(
@@ -516,7 +528,10 @@ mod tests {
                 .unwrap();
         }
         assert!(
-            matches!(monitor.check_drift("sepsis-risk-v2.1"), DriftStatus::Warning { .. }),
+            matches!(
+                monitor.check_drift("sepsis-risk-v2.1"),
+                DriftStatus::Warning { .. }
+            ),
             "expected Warning after mild degradation"
         );
         // Warning must NOT auto-revoke.
@@ -562,7 +577,9 @@ mod tests {
                 .unwrap();
         }
 
-        let status = registry.check_and_update("sepsis-risk-v2.1", &monitor).unwrap();
+        let status = registry
+            .check_and_update("sepsis-risk-v2.1", &monitor)
+            .unwrap();
         assert_eq!(status, DriftStatus::Stable);
         assert!(registry.is_approved("sepsis-risk-v2.1"));
     }

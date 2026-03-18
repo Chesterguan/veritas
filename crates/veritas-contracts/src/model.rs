@@ -184,10 +184,7 @@ pub trait ModelCapability: Send + Sync {
     /// 1. Calling `validate_input` (or the policy engine will do so first).
     /// 2. Recording any internal errors as `VeritasError` variants.
     /// 3. Returning a `ModelResult` that includes timing and token metadata.
-    fn invoke(
-        &self,
-        input: &serde_json::Value,
-    ) -> VeritasResult<ModelResult<serde_json::Value>>;
+    fn invoke(&self, input: &serde_json::Value) -> VeritasResult<ModelResult<serde_json::Value>>;
 
     /// Validate the input schema and semantic constraints before invocation.
     ///
@@ -411,7 +408,10 @@ mod tests {
         assert_eq!(ModelModality::TextToText, ModelModality::TextToText);
         assert_eq!(ModelModality::ImageToText, ModelModality::ImageToText);
         assert_ne!(ModelModality::TextToText, ModelModality::ImageToText);
-        assert_ne!(ModelModality::TabularToScore, ModelModality::TimeSeriesToAlert);
+        assert_ne!(
+            ModelModality::TabularToScore,
+            ModelModality::TimeSeriesToAlert
+        );
     }
 
     #[test]

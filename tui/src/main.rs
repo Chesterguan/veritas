@@ -34,13 +34,13 @@ use serde_json::json;
 
 use veritas_audit::{AuditEvent, InMemoryAuditWriter};
 use veritas_contracts::{
-    ApprovalStatus, DriftMonitor, ModelModality, ModelProvenance,
     agent::{AgentId, AgentInput, AgentOutput, AgentState, ExecutionId},
     capability::{Capability, CapabilitySet},
     error::{VeritasError, VeritasResult},
     execution::{StepRecord, StepResult},
     policy::PolicyVerdict,
     verify::{OutputSchema, VerificationRule, VerificationRuleType},
+    ApprovalStatus, DriftMonitor, ModelModality, ModelProvenance,
 };
 use veritas_core::{
     executor::Executor,
@@ -48,8 +48,8 @@ use veritas_core::{
 };
 use veritas_model::{DriftConfig, InMemoryDriftMonitor, ModelRegistry, RegisteredModel};
 use veritas_policy::engine::TomlPolicyEngine;
-use veritas_ref_healthcare::scenarios::drug_interaction::DrugInteractionAgent;
 use veritas_ref_healthcare::mock_data::{check_drug_interaction, get_patient_symptoms};
+use veritas_ref_healthcare::scenarios::drug_interaction::DrugInteractionAgent;
 use veritas_verify::engine::SchemaVerifier;
 
 // ── Policy TOML constants ─────────────────────────────────────────────────────
@@ -372,7 +372,11 @@ impl Agent for SymptomAnalyzerAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
         vec!["clinical-data.read".to_string()]
@@ -380,17 +384,26 @@ impl Agent for SymptomAnalyzerAgent {
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
         ("analyze".to_string(), "symptom-data".to_string())
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 struct DiagnosisSuggesterAgent;
 
 impl Agent for DiagnosisSuggesterAgent {
     fn propose(&self, state: &AgentState, input: &AgentInput) -> VeritasResult<AgentOutput> {
-        let flags = input.payload["flags"].as_array().cloned().unwrap_or_default();
+        let flags = input.payload["flags"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
         let has_fatigue = flags.iter().any(|f| f.as_str() == Some("fatigue"));
         let has_pallor = flags.iter().any(|f| f.as_str() == Some("pallor"));
-        let primary = if has_fatigue && has_pallor { "Iron deficiency anemia" } else { "Unspecified fatigue syndrome" };
+        let primary = if has_fatigue && has_pallor {
+            "Iron deficiency anemia"
+        } else {
+            "Unspecified fatigue syndrome"
+        };
         Ok(AgentOutput {
             kind: "diagnosis-suggestion".to_string(),
             payload: json!({
@@ -407,22 +420,33 @@ impl Agent for DiagnosisSuggesterAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
         vec!["clinical-data.read".to_string()]
     }
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
-        ("suggest-diagnosis".to_string(), "clinical-analysis".to_string())
+        (
+            "suggest-diagnosis".to_string(),
+            "clinical-analysis".to_string(),
+        )
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 struct TreatmentPlannerAgent;
 
 impl Agent for TreatmentPlannerAgent {
     fn propose(&self, state: &AgentState, input: &AgentInput) -> VeritasResult<AgentOutput> {
-        let primary = input.payload["primary_hypothesis"].as_str().unwrap_or("unknown diagnosis");
+        let primary = input.payload["primary_hypothesis"]
+            .as_str()
+            .unwrap_or("unknown diagnosis");
         Ok(AgentOutput {
             kind: "treatment-plan".to_string(),
             payload: json!({
@@ -435,7 +459,11 @@ impl Agent for TreatmentPlannerAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
         vec!["treatment.write".to_string()]
@@ -443,7 +471,9 @@ impl Agent for TreatmentPlannerAgent {
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
         ("plan-treatment".to_string(), "diagnosis-data".to_string())
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 struct DrugSafetyCheckerAgent;
@@ -461,9 +491,13 @@ impl Agent for DrugSafetyCheckerAgent {
                 let result = check_drug_interaction(meds[i], meds[j]);
                 let severity = result["result"]["severity"].as_str().unwrap_or("UNKNOWN");
                 if severity != "UNKNOWN" {
-                    if severity == "HIGH" { max_severity = "HIGH"; }
-                    else if max_severity != "HIGH" && severity == "MEDIUM" { max_severity = "MEDIUM"; }
-                    else if max_severity == "NONE" && severity == "LOW" { max_severity = "LOW"; }
+                    if severity == "HIGH" {
+                        max_severity = "HIGH";
+                    } else if max_severity != "HIGH" && severity == "MEDIUM" {
+                        max_severity = "MEDIUM";
+                    } else if max_severity == "NONE" && severity == "LOW" {
+                        max_severity = "LOW";
+                    }
                     interactions.push(json!({
                         "drug_a": meds[i], "drug_b": meds[j],
                         "severity": severity,
@@ -487,7 +521,11 @@ impl Agent for DrugSafetyCheckerAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
         vec!["drug-database.read".to_string()]
@@ -495,7 +533,9 @@ impl Agent for DrugSafetyCheckerAgent {
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
         ("check-drug-safety".to_string(), "drug-database".to_string())
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 /// Configuration for a single pipeline stage execution.
@@ -513,11 +553,33 @@ struct StepConfig<'a> {
 fn pipeline_step<A: Agent>(
     agent: &A,
     cfg: StepConfig<'_>,
-) -> (Option<serde_json::Value>, Vec<AuditEvent>, bool, PolicyVerdict) {
-    let StepConfig { policy_toml, agent_id, input_payload, input_kind, caps, schema, register_high_risk_rule } = cfg;
+) -> (
+    Option<serde_json::Value>,
+    Vec<AuditEvent>,
+    bool,
+    PolicyVerdict,
+) {
+    let StepConfig {
+        policy_toml,
+        agent_id,
+        input_payload,
+        input_kind,
+        caps,
+        schema,
+        register_high_risk_rule,
+    } = cfg;
     let policy = match TomlPolicyEngine::from_toml_str(policy_toml) {
         Ok(p) => p,
-        Err(_) => return (None, vec![], false, PolicyVerdict::Deny { reason: "policy error".to_string() }),
+        Err(_) => {
+            return (
+                None,
+                vec![],
+                false,
+                PolicyVerdict::Deny {
+                    reason: "policy error".to_string(),
+                },
+            )
+        }
     };
     let exec_id = ExecutionId::new();
     let audit = Arc::new(InMemoryAuditWriter::new(exec_id.0.to_string()));
@@ -532,20 +594,26 @@ fn pipeline_step<A: Agent>(
     for c in caps {
         capability_set.grant(Capability::new(*c));
     }
-    let input = AgentInput { kind: input_kind.to_string(), payload: input_payload };
+    let input = AgentInput {
+        kind: input_kind.to_string(),
+        payload: input_payload,
+    };
 
     let mut verifier = SchemaVerifier::new();
     if register_high_risk_rule {
-        verifier.register_rule("no-high-risk-unreviewed", Box::new(|payload| {
-            let report = &payload["safety_report"];
-            let risk = report["overall_risk"].as_str().unwrap_or("NONE");
-            let reviewed = report["reviewed"].as_bool().unwrap_or(false);
-            if risk == "HIGH" && !reviewed {
-                Some("HIGH-risk output must have reviewed=true".to_string())
-            } else {
-                None
-            }
-        }));
+        verifier.register_rule(
+            "no-high-risk-unreviewed",
+            Box::new(|payload| {
+                let report = &payload["safety_report"];
+                let risk = report["overall_risk"].as_str().unwrap_or("NONE");
+                let reviewed = report["reviewed"].as_bool().unwrap_or(false);
+                if risk == "HIGH" && !reviewed {
+                    Some("HIGH-risk output must have reviewed=true".to_string())
+                } else {
+                    None
+                }
+            }),
+        );
     }
 
     let executor = Executor::new(
@@ -560,16 +628,36 @@ fn pipeline_step<A: Agent>(
     let integrity = audit.verify_integrity();
 
     match result {
-        Ok(StepResult::Complete { output, .. }) | Ok(StepResult::Transitioned { output, .. }) => {
-            (Some(output.payload), log.events, integrity, PolicyVerdict::Allow)
-        }
+        Ok(StepResult::Complete { output, .. }) | Ok(StepResult::Transitioned { output, .. }) => (
+            Some(output.payload),
+            log.events,
+            integrity,
+            PolicyVerdict::Allow,
+        ),
         Ok(StepResult::Denied { reason, .. }) => {
             (None, log.events, integrity, PolicyVerdict::Deny { reason })
         }
-        Ok(StepResult::AwaitingApproval { reason, approver_role, .. }) => {
-            (None, log.events, integrity, PolicyVerdict::RequireApproval { reason, approver_role })
-        }
-        Err(_) => (None, log.events, integrity, PolicyVerdict::Deny { reason: "executor error".to_string() }),
+        Ok(StepResult::AwaitingApproval {
+            reason,
+            approver_role,
+            ..
+        }) => (
+            None,
+            log.events,
+            integrity,
+            PolicyVerdict::RequireApproval {
+                reason,
+                approver_role,
+            },
+        ),
+        Err(_) => (
+            None,
+            log.events,
+            integrity,
+            PolicyVerdict::Deny {
+                reason: "executor error".to_string(),
+            },
+        ),
     }
 }
 
@@ -581,12 +669,16 @@ fn symptom_analyzer_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-flags".to_string(),
                 description: "Output must contain the classified symptom flags".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "flags".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "flags".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-severity-level".to_string(),
                 description: "Output must include an overall severity classification".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "severity_level".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "severity_level".to_string(),
+                },
             },
         ],
     }
@@ -600,12 +692,16 @@ fn diagnosis_suggester_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-diagnoses".to_string(),
                 description: "Output must contain differential diagnoses".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "diagnoses".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "diagnoses".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-primary-hypothesis".to_string(),
                 description: "Output must name the primary diagnostic hypothesis".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "primary_hypothesis".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "primary_hypothesis".to_string(),
+                },
             },
         ],
     }
@@ -619,12 +715,16 @@ fn treatment_planner_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-medications".to_string(),
                 description: "Output must list the proposed medications".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "medications".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "medications".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-plan-summary".to_string(),
                 description: "Output must include a treatment plan summary".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "plan_summary".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "plan_summary".to_string(),
+                },
             },
         ],
     }
@@ -638,12 +738,17 @@ fn drug_safety_checker_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-safety-report".to_string(),
                 description: "Output must contain the drug safety report".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "safety_report".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "safety_report".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "no-high-risk-unreviewed".to_string(),
-                description: "HIGH-risk interactions must be explicitly reviewed before delivery".to_string(),
-                rule_type: VerificationRuleType::Custom { function_name: "no-high-risk-unreviewed".to_string() },
+                description: "HIGH-risk interactions must be explicitly reviewed before delivery"
+                    .to_string(),
+                rule_type: VerificationRuleType::Custom {
+                    function_name: "no-high-risk-unreviewed".to_string(),
+                },
             },
         ],
     }
@@ -652,46 +757,94 @@ fn drug_safety_checker_schema() -> OutputSchema {
 fn run_clinical_pipeline() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDisplay>) {
     // Stage 1: SymptomAnalyzer
     let agent1 = SymptomAnalyzerAgent;
-    let (out1, events1, int1, v1) = pipeline_step(&agent1, StepConfig {
-        policy_toml: PIPELINE_POLICY, agent_id: "symptom-analyzer-agent",
-        input_payload: json!({ "patient_id": "patient-101" }), input_kind: "symptom-analysis-request",
-        caps: &["clinical-data.read"], schema: symptom_analyzer_schema(), register_high_risk_rule: false,
-    });
+    let (out1, events1, int1, v1) = pipeline_step(
+        &agent1,
+        StepConfig {
+            policy_toml: PIPELINE_POLICY,
+            agent_id: "symptom-analyzer-agent",
+            input_payload: json!({ "patient_id": "patient-101" }),
+            input_kind: "symptom-analysis-request",
+            caps: &["clinical-data.read"],
+            schema: symptom_analyzer_schema(),
+            register_high_risk_rule: false,
+        },
+    );
 
     // Stage 2: DiagnosisSuggester
     let agent2 = DiagnosisSuggesterAgent;
     let input2 = out1.clone().unwrap_or(json!({}));
-    let (out2, events2, int2, v2) = pipeline_step(&agent2, StepConfig {
-        policy_toml: PIPELINE_POLICY, agent_id: "diagnosis-suggester-agent",
-        input_payload: input2, input_kind: "diagnosis-request",
-        caps: &["clinical-data.read"], schema: diagnosis_suggester_schema(), register_high_risk_rule: false,
-    });
+    let (out2, events2, int2, v2) = pipeline_step(
+        &agent2,
+        StepConfig {
+            policy_toml: PIPELINE_POLICY,
+            agent_id: "diagnosis-suggester-agent",
+            input_payload: input2,
+            input_kind: "diagnosis-request",
+            caps: &["clinical-data.read"],
+            schema: diagnosis_suggester_schema(),
+            register_high_risk_rule: false,
+        },
+    );
 
     // Stage 3: TreatmentPlanner
     let agent3 = TreatmentPlannerAgent;
     let input3 = out2.clone().unwrap_or(json!({}));
-    let (out3, events3, int3, v3) = pipeline_step(&agent3, StepConfig {
-        policy_toml: PIPELINE_POLICY, agent_id: "treatment-planner-agent",
-        input_payload: input3, input_kind: "treatment-plan-request",
-        caps: &["treatment.write"], schema: treatment_planner_schema(), register_high_risk_rule: false,
-    });
+    let (out3, events3, int3, v3) = pipeline_step(
+        &agent3,
+        StepConfig {
+            policy_toml: PIPELINE_POLICY,
+            agent_id: "treatment-planner-agent",
+            input_payload: input3,
+            input_kind: "treatment-plan-request",
+            caps: &["treatment.write"],
+            schema: treatment_planner_schema(),
+            register_high_risk_rule: false,
+        },
+    );
 
     // Stage 4: DrugSafetyChecker
     let agent4 = DrugSafetyCheckerAgent;
     let input4 = out3.clone().unwrap_or(json!({}));
-    let (out4, events4, int4, v4) = pipeline_step(&agent4, StepConfig {
-        policy_toml: PIPELINE_POLICY, agent_id: "drug-safety-checker-agent",
-        input_payload: input4, input_kind: "drug-safety-request",
-        caps: &["drug-database.read"], schema: drug_safety_checker_schema(), register_high_risk_rule: true,
-    });
+    let (out4, events4, int4, v4) = pipeline_step(
+        &agent4,
+        StepConfig {
+            policy_toml: PIPELINE_POLICY,
+            agent_id: "drug-safety-checker-agent",
+            input_payload: input4,
+            input_kind: "drug-safety-request",
+            caps: &["drug-database.read"],
+            schema: drug_safety_checker_schema(),
+            register_high_risk_rule: true,
+        },
+    );
 
     // Build pipeline steps showing each stage
     let mut steps = Vec::new();
     let stage_info = [
-        ("Stage 1: SymptomAnalyzer", "analyze | symptom-data", &v1, out1.is_some()),
-        ("Stage 2: DiagnosisSuggester", "suggest-diagnosis | clinical-analysis", &v2, out2.is_some()),
-        ("Stage 3: TreatmentPlanner", "plan-treatment | diagnosis-data", &v3, out3.is_some()),
-        ("Stage 4: DrugSafetyChecker", "check-drug-safety | drug-database", &v4, out4.is_some()),
+        (
+            "Stage 1: SymptomAnalyzer",
+            "analyze | symptom-data",
+            &v1,
+            out1.is_some(),
+        ),
+        (
+            "Stage 2: DiagnosisSuggester",
+            "suggest-diagnosis | clinical-analysis",
+            &v2,
+            out2.is_some(),
+        ),
+        (
+            "Stage 3: TreatmentPlanner",
+            "plan-treatment | diagnosis-data",
+            &v3,
+            out3.is_some(),
+        ),
+        (
+            "Stage 4: DrugSafetyChecker",
+            "check-drug-safety | drug-database",
+            &v4,
+            out4.is_some(),
+        ),
     ];
     for (name, action_res, verdict, has_output) in &stage_info {
         let (status, detail) = match verdict {
@@ -699,14 +852,30 @@ fn run_clinical_pipeline() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEnt
                 if *has_output {
                     (StepStatus::Pass, format!("Allow — {action_res} — verified"))
                 } else {
-                    (StepStatus::Fail, format!("Allow — {action_res} — no output"))
+                    (
+                        StepStatus::Fail,
+                        format!("Allow — {action_res} — no output"),
+                    )
                 }
             }
-            PolicyVerdict::Deny { reason } => (StepStatus::Denied, format!("Deny — {}", truncate(reason, 50))),
-            PolicyVerdict::RequireApproval { approver_role, .. } => (StepStatus::AwaitingApproval, format!("RequireApproval — {approver_role}")),
-            PolicyVerdict::RequireVerification { check_id } => (StepStatus::Pass, format!("RequireVerification — {check_id}")),
+            PolicyVerdict::Deny { reason } => (
+                StepStatus::Denied,
+                format!("Deny — {}", truncate(reason, 50)),
+            ),
+            PolicyVerdict::RequireApproval { approver_role, .. } => (
+                StepStatus::AwaitingApproval,
+                format!("RequireApproval — {approver_role}"),
+            ),
+            PolicyVerdict::RequireVerification { check_id } => (
+                StepStatus::Pass,
+                format!("RequireVerification — {check_id}"),
+            ),
         };
-        steps.push(PipelineStep { name: (*name).to_string(), status, detail });
+        steps.push(PipelineStep {
+            name: (*name).to_string(),
+            status,
+            detail,
+        });
     }
 
     // Build audit entries: show all 4 chains concatenated with labels
@@ -733,31 +902,45 @@ fn run_clinical_pipeline() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEnt
                 PolicyVerdict::RequireVerification { .. } => "require-verify",
             };
             let is_genesis = e.sequence == 0
-                && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+                && e.prev_hash
+                    == "0000000000000000000000000000000000000000000000000000000000000000";
             all_entries.push(AuditEntryDisplay {
                 sequence: e.sequence,
                 hash_short: shorten_hash(&e.this_hash),
-                kind: if is_genesis { "genesis".to_string() } else { kind.to_string() },
+                kind: if is_genesis {
+                    "genesis".to_string()
+                } else {
+                    kind.to_string()
+                },
                 verified: *integrity,
             });
         }
     }
 
     // Build summary capture for the output panel
-    let overall_risk = out4.as_ref()
+    let overall_risk = out4
+        .as_ref()
         .and_then(|o| o["safety_report"]["overall_risk"].as_str())
         .unwrap_or("?")
         .to_string();
-    let interactions_found = out4.as_ref()
+    let interactions_found = out4
+        .as_ref()
         .and_then(|o| o["safety_report"]["interactions_found"].as_u64())
         .unwrap_or(0);
-    let primary_dx = out2.as_ref()
+    let primary_dx = out2
+        .as_ref()
         .and_then(|o| o["primary_hypothesis"].as_str())
         .unwrap_or("?")
         .to_string();
-    let meds = out3.as_ref()
+    let meds = out3
+        .as_ref()
         .and_then(|o| o["medications"].as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
         .unwrap_or_default();
     let risk_color = match overall_risk.as_str() {
         "HIGH" => Color::Red,
@@ -766,10 +949,26 @@ fn run_clinical_pipeline() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEnt
     };
     let all_ok = int1 && int2 && int3 && int4;
     let extra_lines = vec![
-        ("Primary Dx".to_string(), truncate(&primary_dx, 50), Color::White),
+        (
+            "Primary Dx".to_string(),
+            truncate(&primary_dx, 50),
+            Color::White,
+        ),
         ("Medications".to_string(), truncate(&meds, 60), Color::White),
-        ("Overall Risk".to_string(), format!("{overall_risk} ({interactions_found} interaction(s))"), risk_color),
-        ("All Audit Chains".to_string(), if all_ok { "VERIFIED".to_string() } else { "INTEGRITY FAILURE".to_string() }, if all_ok { Color::Green } else { Color::Red }),
+        (
+            "Overall Risk".to_string(),
+            format!("{overall_risk} ({interactions_found} interaction(s))"),
+            risk_color,
+        ),
+        (
+            "All Audit Chains".to_string(),
+            if all_ok {
+                "VERIFIED".to_string()
+            } else {
+                "INTEGRITY FAILURE".to_string()
+            },
+            if all_ok { Color::Green } else { Color::Red },
+        ),
     ];
 
     let representative_output = out4.as_ref().map(|_| AgentOutput {
@@ -808,20 +1007,36 @@ impl Agent for ClinicalProposalAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "awaiting-approval".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "awaiting-approval".to_string(),
+            ..state.clone()
+        })
     }
-    fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> { vec![] }
+    fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
+        vec![]
+    }
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
-        ("propose-procedure".to_string(), "high-cost-procedure".to_string())
+        (
+            "propose-procedure".to_string(),
+            "high-cost-procedure".to_string(),
+        )
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
-struct InsuranceEligibilityAgent { covered: bool }
+struct InsuranceEligibilityAgent {
+    covered: bool,
+}
 
 impl Agent for InsuranceEligibilityAgent {
     fn propose(&self, _state: &AgentState, input: &AgentInput) -> VeritasResult<AgentOutput> {
-        let procedure = input.payload["procedure"].as_str().unwrap_or("unknown").to_string();
+        let procedure = input.payload["procedure"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string();
         Ok(AgentOutput {
             kind: "insurance-eligibility-result".to_string(),
             payload: json!({
@@ -834,23 +1049,36 @@ impl Agent for InsuranceEligibilityAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
         vec!["insurance.read".to_string()]
     }
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
-        let resource = if self.covered { "insurance-records" } else { "uncovered-procedure" };
+        let resource = if self.covered {
+            "insurance-records"
+        } else {
+            "uncovered-procedure"
+        };
         ("check-coverage".to_string(), resource.to_string())
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 struct PASubmissionAgent;
 
 impl Agent for PASubmissionAgent {
     fn propose(&self, state: &AgentState, input: &AgentInput) -> VeritasResult<AgentOutput> {
-        let procedure = input.payload["procedure"].as_str().unwrap_or("unknown").to_string();
+        let procedure = input.payload["procedure"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string();
         Ok(AgentOutput {
             kind: "pa-submission-result".to_string(),
             payload: json!({
@@ -863,7 +1091,11 @@ impl Agent for PASubmissionAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
         vec!["pa.write".to_string()]
@@ -871,7 +1103,9 @@ impl Agent for PASubmissionAgent {
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
         ("submit-pa".to_string(), "pa-system".to_string())
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 fn clinical_proposal_schema() -> OutputSchema {
@@ -881,7 +1115,9 @@ fn clinical_proposal_schema() -> OutputSchema {
         rules: vec![VerificationRule {
             rule_id: "req-procedure".to_string(),
             description: "Proposal must name the requested procedure".to_string(),
-            rule_type: VerificationRuleType::RequiredField { field_path: "procedure".to_string() },
+            rule_type: VerificationRuleType::RequiredField {
+                field_path: "procedure".to_string(),
+            },
         }],
     }
 }
@@ -894,12 +1130,17 @@ fn insurance_eligibility_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-procedure".to_string(),
                 description: "Eligibility result must name the procedure checked".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "procedure".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "procedure".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-covered".to_string(),
-                description: "Eligibility result must state whether procedure is covered".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "covered".to_string() },
+                description: "Eligibility result must state whether procedure is covered"
+                    .to_string(),
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "covered".to_string(),
+                },
             },
         ],
     }
@@ -913,12 +1154,16 @@ fn pa_submission_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-pa-reference".to_string(),
                 description: "Submission result must include a PA reference number".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "pa_reference".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "pa_reference".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-status".to_string(),
                 description: "Submission result must include a status field".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "status".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "status".to_string(),
+                },
             },
         ],
     }
@@ -929,18 +1174,29 @@ fn run_prior_auth() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDispl
     let mut all_entries: Vec<AuditEntryDisplay> = Vec::new();
 
     // Step 1: ClinicalProposalAgent → RequireApproval
-    let (out_step1, events1, int1, verdict1) = pipeline_step(&ClinicalProposalAgent, StepConfig {
-        policy_toml: PRIOR_AUTH_POLICY, agent_id: "clinical-proposal-agent",
-        input_payload: json!({ "procedure": "cardiac-mri", "urgency": "routine" }),
-        input_kind: "procedure-proposal-request",
-        caps: &[], schema: clinical_proposal_schema(), register_high_risk_rule: false,
-    });
+    let (out_step1, events1, int1, verdict1) = pipeline_step(
+        &ClinicalProposalAgent,
+        StepConfig {
+            policy_toml: PRIOR_AUTH_POLICY,
+            agent_id: "clinical-proposal-agent",
+            input_payload: json!({ "procedure": "cardiac-mri", "urgency": "routine" }),
+            input_kind: "procedure-proposal-request",
+            caps: &[],
+            schema: clinical_proposal_schema(),
+            register_high_risk_rule: false,
+        },
+    );
     steps.push(PipelineStep {
         name: "Step 1: ClinicalProposal".to_string(),
         status: StepStatus::AwaitingApproval,
         detail: "propose-procedure | high-cost-procedure → RequireApproval".to_string(),
     });
-    all_entries.push(AuditEntryDisplay { sequence: 0, hash_short: "── step-1 ──".to_string(), kind: "label".to_string(), verified: int1 });
+    all_entries.push(AuditEntryDisplay {
+        sequence: 0,
+        hash_short: "── step-1 ──".to_string(),
+        kind: "label".to_string(),
+        verified: int1,
+    });
     for e in &events1 {
         let kind = match &e.record.verdict {
             PolicyVerdict::Allow => "allow",
@@ -948,11 +1204,16 @@ fn run_prior_auth() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDispl
             PolicyVerdict::RequireApproval { .. } => "require-approval",
             PolicyVerdict::RequireVerification { .. } => "require-verify",
         };
-        let is_genesis = e.sequence == 0 && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+        let is_genesis = e.sequence == 0
+            && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
         all_entries.push(AuditEntryDisplay {
             sequence: e.sequence,
             hash_short: shorten_hash(&e.this_hash),
-            kind: if is_genesis { "genesis".to_string() } else { kind.to_string() },
+            kind: if is_genesis {
+                "genesis".to_string()
+            } else {
+                kind.to_string()
+            },
             verified: int1,
         });
     }
@@ -967,69 +1228,177 @@ fn run_prior_auth() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDispl
 
     // Step 2a: InsuranceEligibility (covered=true) → Allow
     let (out_step2a, events2a, int2a, _v2a) = pipeline_step(
-        &InsuranceEligibilityAgent { covered: true }, StepConfig {
-        policy_toml: PRIOR_AUTH_POLICY, agent_id: "insurance-eligibility-agent",
-        input_payload: json!({ "procedure": "cardiac-mri" }), input_kind: "insurance-eligibility-request",
-        caps: &["insurance.read"], schema: insurance_eligibility_schema(), register_high_risk_rule: false,
-    });
+        &InsuranceEligibilityAgent { covered: true },
+        StepConfig {
+            policy_toml: PRIOR_AUTH_POLICY,
+            agent_id: "insurance-eligibility-agent",
+            input_payload: json!({ "procedure": "cardiac-mri" }),
+            input_kind: "insurance-eligibility-request",
+            caps: &["insurance.read"],
+            schema: insurance_eligibility_schema(),
+            register_high_risk_rule: false,
+        },
+    );
     steps.push(PipelineStep {
         name: "Step 2a: Eligibility [covered]".to_string(),
-        status: if out_step2a.is_some() { StepStatus::Pass } else { StepStatus::Denied },
+        status: if out_step2a.is_some() {
+            StepStatus::Pass
+        } else {
+            StepStatus::Denied
+        },
         detail: "check-coverage | insurance-records → Allow".to_string(),
     });
-    all_entries.push(AuditEntryDisplay { sequence: 0, hash_short: "── step-2a ──".to_string(), kind: "label".to_string(), verified: int2a });
+    all_entries.push(AuditEntryDisplay {
+        sequence: 0,
+        hash_short: "── step-2a ──".to_string(),
+        kind: "label".to_string(),
+        verified: int2a,
+    });
     for e in &events2a {
-        let kind = match &e.record.verdict { PolicyVerdict::Allow => "allow", PolicyVerdict::Deny { .. } => "deny", _ => "other" };
-        let is_genesis = e.sequence == 0 && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
-        all_entries.push(AuditEntryDisplay { sequence: e.sequence, hash_short: shorten_hash(&e.this_hash), kind: if is_genesis { "genesis".to_string() } else { kind.to_string() }, verified: int2a });
+        let kind = match &e.record.verdict {
+            PolicyVerdict::Allow => "allow",
+            PolicyVerdict::Deny { .. } => "deny",
+            _ => "other",
+        };
+        let is_genesis = e.sequence == 0
+            && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+        all_entries.push(AuditEntryDisplay {
+            sequence: e.sequence,
+            hash_short: shorten_hash(&e.this_hash),
+            kind: if is_genesis {
+                "genesis".to_string()
+            } else {
+                kind.to_string()
+            },
+            verified: int2a,
+        });
     }
 
     // Step 3: PA Submission
     let input_step3 = out_step2a.clone().unwrap_or(json!({}));
-    let (out_step3, events3, int3, _v3) = pipeline_step(&PASubmissionAgent, StepConfig {
-        policy_toml: PRIOR_AUTH_POLICY, agent_id: "pa-submission-agent",
-        input_payload: input_step3, input_kind: "pa-submission-request",
-        caps: &["pa.write"], schema: pa_submission_schema(), register_high_risk_rule: false,
-    });
-    let pa_ref = out_step3.as_ref().and_then(|o| o["pa_reference"].as_str()).unwrap_or("?").to_string();
+    let (out_step3, events3, int3, _v3) = pipeline_step(
+        &PASubmissionAgent,
+        StepConfig {
+            policy_toml: PRIOR_AUTH_POLICY,
+            agent_id: "pa-submission-agent",
+            input_payload: input_step3,
+            input_kind: "pa-submission-request",
+            caps: &["pa.write"],
+            schema: pa_submission_schema(),
+            register_high_risk_rule: false,
+        },
+    );
+    let pa_ref = out_step3
+        .as_ref()
+        .and_then(|o| o["pa_reference"].as_str())
+        .unwrap_or("?")
+        .to_string();
     steps.push(PipelineStep {
         name: "Step 3: PA Submission".to_string(),
-        status: if out_step3.is_some() { StepStatus::Pass } else { StepStatus::Denied },
+        status: if out_step3.is_some() {
+            StepStatus::Pass
+        } else {
+            StepStatus::Denied
+        },
         detail: format!("submit-pa | pa-system → {pa_ref}"),
     });
-    all_entries.push(AuditEntryDisplay { sequence: 0, hash_short: "── step-3 ──".to_string(), kind: "label".to_string(), verified: int3 });
+    all_entries.push(AuditEntryDisplay {
+        sequence: 0,
+        hash_short: "── step-3 ──".to_string(),
+        kind: "label".to_string(),
+        verified: int3,
+    });
     for e in &events3 {
-        let kind = match &e.record.verdict { PolicyVerdict::Allow => "allow", PolicyVerdict::Deny { .. } => "deny", _ => "other" };
-        let is_genesis = e.sequence == 0 && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
-        all_entries.push(AuditEntryDisplay { sequence: e.sequence, hash_short: shorten_hash(&e.this_hash), kind: if is_genesis { "genesis".to_string() } else { kind.to_string() }, verified: int3 });
+        let kind = match &e.record.verdict {
+            PolicyVerdict::Allow => "allow",
+            PolicyVerdict::Deny { .. } => "deny",
+            _ => "other",
+        };
+        let is_genesis = e.sequence == 0
+            && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+        all_entries.push(AuditEntryDisplay {
+            sequence: e.sequence,
+            hash_short: shorten_hash(&e.this_hash),
+            kind: if is_genesis {
+                "genesis".to_string()
+            } else {
+                kind.to_string()
+            },
+            verified: int3,
+        });
     }
 
     // Step 2b: InsuranceEligibility (covered=false) → Deny
     let (_out_step2b, events2b, int2b, _v2b) = pipeline_step(
-        &InsuranceEligibilityAgent { covered: false }, StepConfig {
-        policy_toml: PRIOR_AUTH_POLICY, agent_id: "insurance-eligibility-agent",
-        input_payload: json!({ "procedure": "cardiac-mri" }), input_kind: "insurance-eligibility-request",
-        caps: &["insurance.read"], schema: insurance_eligibility_schema(), register_high_risk_rule: false,
-    });
+        &InsuranceEligibilityAgent { covered: false },
+        StepConfig {
+            policy_toml: PRIOR_AUTH_POLICY,
+            agent_id: "insurance-eligibility-agent",
+            input_payload: json!({ "procedure": "cardiac-mri" }),
+            input_kind: "insurance-eligibility-request",
+            caps: &["insurance.read"],
+            schema: insurance_eligibility_schema(),
+            register_high_risk_rule: false,
+        },
+    );
     steps.push(PipelineStep {
         name: "Step 2b: Eligibility [uncovered]".to_string(),
         status: StepStatus::Denied,
         detail: "check-coverage | uncovered-procedure → Deny".to_string(),
     });
-    all_entries.push(AuditEntryDisplay { sequence: 0, hash_short: "── step-2b ──".to_string(), kind: "label".to_string(), verified: int2b });
+    all_entries.push(AuditEntryDisplay {
+        sequence: 0,
+        hash_short: "── step-2b ──".to_string(),
+        kind: "label".to_string(),
+        verified: int2b,
+    });
     for e in &events2b {
-        let kind = match &e.record.verdict { PolicyVerdict::Allow => "allow", PolicyVerdict::Deny { .. } => "deny", _ => "other" };
-        let is_genesis = e.sequence == 0 && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
-        all_entries.push(AuditEntryDisplay { sequence: e.sequence, hash_short: shorten_hash(&e.this_hash), kind: if is_genesis { "genesis".to_string() } else { kind.to_string() }, verified: int2b });
+        let kind = match &e.record.verdict {
+            PolicyVerdict::Allow => "allow",
+            PolicyVerdict::Deny { .. } => "deny",
+            _ => "other",
+        };
+        let is_genesis = e.sequence == 0
+            && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+        all_entries.push(AuditEntryDisplay {
+            sequence: e.sequence,
+            hash_short: shorten_hash(&e.this_hash),
+            kind: if is_genesis {
+                "genesis".to_string()
+            } else {
+                kind.to_string()
+            },
+            verified: int2b,
+        });
     }
 
     let _ = (out_step1, verdict1);
     let all_ok = int1 && int2a && int3 && int2b;
     let extra_lines = vec![
-        ("Procedure".to_string(), "cardiac-mri (routine)".to_string(), Color::White),
-        ("Sub-case A".to_string(), format!("PA submitted: {pa_ref}"), Color::Green),
-        ("Sub-case B".to_string(), "PA denied at eligibility (not covered)".to_string(), Color::Red),
-        ("All Audit Chains".to_string(), if all_ok { "VERIFIED".to_string() } else { "FAILED".to_string() }, if all_ok { Color::Green } else { Color::Red }),
+        (
+            "Procedure".to_string(),
+            "cardiac-mri (routine)".to_string(),
+            Color::White,
+        ),
+        (
+            "Sub-case A".to_string(),
+            format!("PA submitted: {pa_ref}"),
+            Color::Green,
+        ),
+        (
+            "Sub-case B".to_string(),
+            "PA denied at eligibility (not covered)".to_string(),
+            Color::Red,
+        ),
+        (
+            "All Audit Chains".to_string(),
+            if all_ok {
+                "VERIFIED".to_string()
+            } else {
+                "FAILED".to_string()
+            },
+            if all_ok { Color::Green } else { Color::Red },
+        ),
     ];
 
     let capture = ExecutionCapture {
@@ -1041,7 +1410,10 @@ fn run_prior_auth() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDispl
         resource: "high-cost-procedure".to_string(),
         capability_name: "pa.write".to_string(),
         capability_granted: true,
-        output: out_step3.map(|p| AgentOutput { kind: "pa-submission-result".to_string(), payload: p }),
+        output: out_step3.map(|p| AgentOutput {
+            kind: "pa-submission-result".to_string(),
+            payload: p,
+        }),
         error: None,
         audit_events: vec![],
         chain_integrity: all_ok,
@@ -1053,7 +1425,9 @@ fn run_prior_auth() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDispl
 
 // ── Scenario 4: Radiology AI Model Governance ─────────────────────────────────
 
-struct RadiologyInferenceAgent { approved: bool }
+struct RadiologyInferenceAgent {
+    approved: bool,
+}
 
 impl Agent for RadiologyInferenceAgent {
     fn propose(&self, _state: &AgentState, _input: &AgentInput) -> VeritasResult<AgentOutput> {
@@ -1069,16 +1443,26 @@ impl Agent for RadiologyInferenceAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
         vec!["model:approved".to_string(), "radiology.read".to_string()]
     }
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
-        let resource = if self.approved { "radiology-model" } else { "radiology-model-unapproved" };
+        let resource = if self.approved {
+            "radiology-model"
+        } else {
+            "radiology-model-unapproved"
+        };
         ("run-inference".to_string(), resource.to_string())
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 fn radiology_output_schema() -> OutputSchema {
@@ -1089,17 +1473,23 @@ fn radiology_output_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-model-id".to_string(),
                 description: "Output must identify the model that produced it".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "model_id".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "model_id".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-finding".to_string(),
                 description: "Output must contain a radiological finding".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "finding".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "finding".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-recommendation".to_string(),
                 description: "Output must contain a clinical recommendation".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "recommendation".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "recommendation".to_string(),
+                },
             },
         ],
     }
@@ -1150,24 +1540,59 @@ fn run_radiology_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntry
     cap_list_a.push("radiology.read");
 
     let agent_a = RadiologyInferenceAgent { approved: true };
-    let (out_a, events_a, int_a, verdict_a) = pipeline_step(&agent_a, StepConfig {
-        policy_toml: MODEL_GOVERNANCE_POLICY, agent_id: "radiology-inference-agent",
-        input_payload: json!({ "image_id": "xray-2026-0313-0042", "patient_id": "patient-517", "view": "PA" }),
-        input_kind: "radiology-inference-request",
-        caps: &cap_list_a, schema: radiology_output_schema(), register_high_risk_rule: false,
-    });
-    let label_a = out_a.as_ref().and_then(|o| o["label"].as_str()).unwrap_or("?");
-    let conf_a = out_a.as_ref().and_then(|o| o["confidence"].as_f64()).unwrap_or(0.0);
+    let (out_a, events_a, int_a, verdict_a) = pipeline_step(
+        &agent_a,
+        StepConfig {
+            policy_toml: MODEL_GOVERNANCE_POLICY,
+            agent_id: "radiology-inference-agent",
+            input_payload: json!({ "image_id": "xray-2026-0313-0042", "patient_id": "patient-517", "view": "PA" }),
+            input_kind: "radiology-inference-request",
+            caps: &cap_list_a,
+            schema: radiology_output_schema(),
+            register_high_risk_rule: false,
+        },
+    );
+    let label_a = out_a
+        .as_ref()
+        .and_then(|o| o["label"].as_str())
+        .unwrap_or("?");
+    let conf_a = out_a
+        .as_ref()
+        .and_then(|o| o["confidence"].as_f64())
+        .unwrap_or(0.0);
     steps.push(PipelineStep {
         name: "Sub-case A: chest-xray-v3.2 [Approved]".to_string(),
-        status: if out_a.is_some() { StepStatus::Pass } else { StepStatus::Denied },
+        status: if out_a.is_some() {
+            StepStatus::Pass
+        } else {
+            StepStatus::Denied
+        },
         detail: format!("Allow — label={label_a}, conf={conf_a:.2}"),
     });
-    all_entries.push(AuditEntryDisplay { sequence: 0, hash_short: "── sub-case A ──".to_string(), kind: "label".to_string(), verified: int_a });
+    all_entries.push(AuditEntryDisplay {
+        sequence: 0,
+        hash_short: "── sub-case A ──".to_string(),
+        kind: "label".to_string(),
+        verified: int_a,
+    });
     for e in &events_a {
-        let kind = match &e.record.verdict { PolicyVerdict::Allow => "allow", PolicyVerdict::Deny { .. } => "deny", _ => "other" };
-        let is_genesis = e.sequence == 0 && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
-        all_entries.push(AuditEntryDisplay { sequence: e.sequence, hash_short: shorten_hash(&e.this_hash), kind: if is_genesis { "genesis".to_string() } else { kind.to_string() }, verified: int_a });
+        let kind = match &e.record.verdict {
+            PolicyVerdict::Allow => "allow",
+            PolicyVerdict::Deny { .. } => "deny",
+            _ => "other",
+        };
+        let is_genesis = e.sequence == 0
+            && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+        all_entries.push(AuditEntryDisplay {
+            sequence: e.sequence,
+            hash_short: shorten_hash(&e.this_hash),
+            kind: if is_genesis {
+                "genesis".to_string()
+            } else {
+                kind.to_string()
+            },
+            verified: int_a,
+        });
     }
 
     // Sub-case B: Experimental model blocked
@@ -1179,22 +1604,47 @@ fn run_radiology_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntry
     cap_list_b.push("radiology.read");
 
     let agent_b = RadiologyInferenceAgent { approved: false };
-    let (_out_b, events_b, int_b, _verdict_b) = pipeline_step(&agent_b, StepConfig {
-        policy_toml: MODEL_GOVERNANCE_POLICY, agent_id: "radiology-inference-agent",
-        input_payload: json!({ "image_id": "xray-2026-0313-0099", "patient_id": "patient-518", "view": "PA" }),
-        input_kind: "radiology-inference-request",
-        caps: &cap_list_b, schema: radiology_output_schema(), register_high_risk_rule: false,
-    });
+    let (_out_b, events_b, int_b, _verdict_b) = pipeline_step(
+        &agent_b,
+        StepConfig {
+            policy_toml: MODEL_GOVERNANCE_POLICY,
+            agent_id: "radiology-inference-agent",
+            input_payload: json!({ "image_id": "xray-2026-0313-0099", "patient_id": "patient-518", "view": "PA" }),
+            input_kind: "radiology-inference-request",
+            caps: &cap_list_b,
+            schema: radiology_output_schema(),
+            register_high_risk_rule: false,
+        },
+    );
     steps.push(PipelineStep {
         name: "Sub-case B: chest-xray-v4.0-beta [Experimental]".to_string(),
         status: StepStatus::Denied,
         detail: "Deny — model:approved absent — propose() NOT called".to_string(),
     });
-    all_entries.push(AuditEntryDisplay { sequence: 0, hash_short: "── sub-case B ──".to_string(), kind: "label".to_string(), verified: int_b });
+    all_entries.push(AuditEntryDisplay {
+        sequence: 0,
+        hash_short: "── sub-case B ──".to_string(),
+        kind: "label".to_string(),
+        verified: int_b,
+    });
     for e in &events_b {
-        let kind = match &e.record.verdict { PolicyVerdict::Allow => "allow", PolicyVerdict::Deny { .. } => "deny", _ => "other" };
-        let is_genesis = e.sequence == 0 && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
-        all_entries.push(AuditEntryDisplay { sequence: e.sequence, hash_short: shorten_hash(&e.this_hash), kind: if is_genesis { "genesis".to_string() } else { kind.to_string() }, verified: int_b });
+        let kind = match &e.record.verdict {
+            PolicyVerdict::Allow => "allow",
+            PolicyVerdict::Deny { .. } => "deny",
+            _ => "other",
+        };
+        let is_genesis = e.sequence == 0
+            && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+        all_entries.push(AuditEntryDisplay {
+            sequence: e.sequence,
+            hash_short: shorten_hash(&e.this_hash),
+            kind: if is_genesis {
+                "genesis".to_string()
+            } else {
+                kind.to_string()
+            },
+            verified: int_b,
+        });
     }
 
     // Sub-case C: Drift detection
@@ -1214,7 +1664,8 @@ fn run_radiology_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntry
     }
     let drift_status = registry_c.check_and_update("chest-xray-v3.2", &monitor_c);
     let still_approved = registry_c.is_approved("chest-xray-v3.2");
-    let revocation_reason = registry_c.get("chest-xray-v3.2")
+    let revocation_reason = registry_c
+        .get("chest-xray-v3.2")
         .and_then(|m| match &m.provenance.approval_status {
             ApprovalStatus::Revoked { reason } => Some(reason.clone()),
             _ => None,
@@ -1226,7 +1677,11 @@ fn run_radiology_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntry
     };
     steps.push(PipelineStep {
         name: "Sub-case C: Drift Detection".to_string(),
-        status: if !still_approved { StepStatus::Denied } else { StepStatus::Pass },
+        status: if !still_approved {
+            StepStatus::Denied
+        } else {
+            StepStatus::Pass
+        },
         detail: format!("drift={drift_label}, approved={still_approved}"),
     });
     // No audit events for drift check (it's out-of-band), add info entry
@@ -1239,17 +1694,41 @@ fn run_radiology_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntry
     all_entries.push(AuditEntryDisplay {
         sequence: 0,
         hash_short: format!("drift={drift_label}"),
-        kind: if still_approved { "allow".to_string() } else { "deny".to_string() },
+        kind: if still_approved {
+            "allow".to_string()
+        } else {
+            "deny".to_string()
+        },
         verified: true,
     });
 
     let _ = verdict_a;
     let all_ok = int_a && int_b;
     let extra_lines = vec![
-        ("Sub-case A".to_string(), format!("Approved model: label={label_a}, conf={conf_a:.2}"), Color::Green),
-        ("Sub-case B".to_string(), "Experimental model: BLOCKED at policy gate".to_string(), Color::Red),
-        ("Sub-case C".to_string(), format!("Drift={drift_label}, auto-revoked={}", !still_approved), if !still_approved { Color::Yellow } else { Color::Green }),
-        ("Revocation".to_string(), truncate(&revocation_reason, 55), Color::Yellow),
+        (
+            "Sub-case A".to_string(),
+            format!("Approved model: label={label_a}, conf={conf_a:.2}"),
+            Color::Green,
+        ),
+        (
+            "Sub-case B".to_string(),
+            "Experimental model: BLOCKED at policy gate".to_string(),
+            Color::Red,
+        ),
+        (
+            "Sub-case C".to_string(),
+            format!("Drift={drift_label}, auto-revoked={}", !still_approved),
+            if !still_approved {
+                Color::Yellow
+            } else {
+                Color::Green
+            },
+        ),
+        (
+            "Revocation".to_string(),
+            truncate(&revocation_reason, 55),
+            Color::Yellow,
+        ),
     ];
 
     let capture = ExecutionCapture {
@@ -1258,7 +1737,10 @@ fn run_radiology_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntry
         resource: "radiology-model".to_string(),
         capability_name: "model:approved + radiology.read".to_string(),
         capability_granted: true,
-        output: out_a.map(|p| AgentOutput { kind: "radiology-inference-result".to_string(), payload: p }),
+        output: out_a.map(|p| AgentOutput {
+            kind: "radiology-inference-result".to_string(),
+            payload: p,
+        }),
         error: None,
         audit_events: vec![],
         chain_integrity: all_ok,
@@ -1270,11 +1752,16 @@ fn run_radiology_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntry
 
 // ── Scenario 5: Sepsis Risk Model with Drift ──────────────────────────────────
 
-struct SepsisRiskAgent { confidence: f64 }
+struct SepsisRiskAgent {
+    confidence: f64,
+}
 
 impl Agent for SepsisRiskAgent {
     fn propose(&self, _state: &AgentState, input: &AgentInput) -> VeritasResult<AgentOutput> {
-        let patient_id = input.payload["patient_id"].as_str().unwrap_or("unknown").to_string();
+        let patient_id = input.payload["patient_id"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string();
         Ok(AgentOutput {
             kind: "sepsis-risk-result".to_string(),
             payload: json!({
@@ -1288,33 +1775,54 @@ impl Agent for SepsisRiskAgent {
         })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
-        vec!["model:approved".to_string(), "patient-vitals.read".to_string()]
+        vec![
+            "model:approved".to_string(),
+            "patient-vitals.read".to_string(),
+        ]
     }
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
         ("score-risk".to_string(), "sepsis-model".to_string())
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 struct SepsisRiskAgentRevoked;
 
 impl Agent for SepsisRiskAgentRevoked {
     fn propose(&self, _state: &AgentState, _input: &AgentInput) -> VeritasResult<AgentOutput> {
-        Ok(AgentOutput { kind: "sepsis-risk-result".to_string(), payload: json!({}) })
+        Ok(AgentOutput {
+            kind: "sepsis-risk-result".to_string(),
+            payload: json!({}),
+        })
     }
     fn transition(&self, state: &AgentState, _output: &AgentOutput) -> VeritasResult<AgentState> {
-        Ok(AgentState { step: state.step + 1, phase: "complete".to_string(), ..state.clone() })
+        Ok(AgentState {
+            step: state.step + 1,
+            phase: "complete".to_string(),
+            ..state.clone()
+        })
     }
     fn required_capabilities(&self, _: &AgentState, _: &AgentInput) -> Vec<String> {
-        vec!["model:approved".to_string(), "patient-vitals.read".to_string()]
+        vec![
+            "model:approved".to_string(),
+            "patient-vitals.read".to_string(),
+        ]
     }
     fn describe_action(&self, _: &AgentState, _: &AgentInput) -> (String, String) {
         ("score-risk".to_string(), "sepsis-model-revoked".to_string())
     }
-    fn is_terminal(&self, state: &AgentState) -> bool { state.phase == "complete" }
+    fn is_terminal(&self, state: &AgentState) -> bool {
+        state.phase == "complete"
+    }
 }
 
 fn sepsis_risk_schema() -> OutputSchema {
@@ -1325,17 +1833,23 @@ fn sepsis_risk_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-model-id".to_string(),
                 description: "Output must identify the scoring model".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "model_id".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "model_id".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-risk-score".to_string(),
                 description: "Output must include a numeric risk score".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "risk_score".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "risk_score".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-recommendation".to_string(),
                 description: "Output must carry a clinical recommendation".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "recommendation".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "recommendation".to_string(),
+                },
             },
         ],
     }
@@ -1379,12 +1893,18 @@ fn run_sepsis_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDis
         let mut cap_list = cap_strs_a;
         cap_list.push("patient-vitals.read");
         let agent = SepsisRiskAgent { confidence: 0.89 };
-        let (out, events, integrity, _v) = pipeline_step(&agent, StepConfig {
-            policy_toml: MODEL_GOVERNANCE_POLICY, agent_id: "sepsis-risk-agent",
-            input_payload: json!({ "patient_id": format!("patient-{}", 600 + i) }),
-            input_kind: "sepsis-risk-request",
-            caps: &cap_list, schema: sepsis_risk_schema(), register_high_risk_rule: false,
-        });
+        let (out, events, integrity, _v) = pipeline_step(
+            &agent,
+            StepConfig {
+                policy_toml: MODEL_GOVERNANCE_POLICY,
+                agent_id: "sepsis-risk-agent",
+                input_payload: json!({ "patient_id": format!("patient-{}", 600 + i) }),
+                input_kind: "sepsis-risk-request",
+                caps: &cap_list,
+                schema: sepsis_risk_schema(),
+                register_high_risk_rule: false,
+            },
+        );
         if let Some(ref payload) = out {
             let conf = payload["confidence"].as_f64().unwrap_or(0.0);
             let _ = monitor_a.record("sepsis-risk-v2.1", &json!({ "confidence": conf }));
@@ -1394,17 +1914,39 @@ fn run_sepsis_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDis
         last_int_a = integrity;
     }
     let status_a = registry_a.check_and_update("sepsis-risk-v2.1", &monitor_a);
-    let stable_str = match &status_a { Ok(s) => format!("{s:?}"), Err(_) => "error".to_string() };
+    let stable_str = match &status_a {
+        Ok(s) => format!("{s:?}"),
+        Err(_) => "error".to_string(),
+    };
     steps.push(PipelineStep {
         name: "Sub-case A: Stable Operation (3 invocations)".to_string(),
         status: StepStatus::Pass,
         detail: format!("conf=0.89 × 3 — drift={stable_str}"),
     });
-    all_entries.push(AuditEntryDisplay { sequence: 0, hash_short: "── sub-case A ──".to_string(), kind: "label".to_string(), verified: last_int_a });
+    all_entries.push(AuditEntryDisplay {
+        sequence: 0,
+        hash_short: "── sub-case A ──".to_string(),
+        kind: "label".to_string(),
+        verified: last_int_a,
+    });
     for e in &last_events_a {
-        let kind = match &e.record.verdict { PolicyVerdict::Allow => "allow", PolicyVerdict::Deny { .. } => "deny", _ => "other" };
-        let is_genesis = e.sequence == 0 && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
-        all_entries.push(AuditEntryDisplay { sequence: e.sequence, hash_short: shorten_hash(&e.this_hash), kind: if is_genesis { "genesis".to_string() } else { kind.to_string() }, verified: last_int_a });
+        let kind = match &e.record.verdict {
+            PolicyVerdict::Allow => "allow",
+            PolicyVerdict::Deny { .. } => "deny",
+            _ => "other",
+        };
+        let is_genesis = e.sequence == 0
+            && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+        all_entries.push(AuditEntryDisplay {
+            sequence: e.sequence,
+            hash_short: shorten_hash(&e.this_hash),
+            kind: if is_genesis {
+                "genesis".to_string()
+            } else {
+                kind.to_string()
+            },
+            verified: last_int_a,
+        });
     }
 
     // Sub-case B: Drift lifecycle — Warning → Drifted → Revoked
@@ -1432,7 +1974,10 @@ fn run_sepsis_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDis
         let _ = monitor_b.record("sepsis-risk-v2.1", &json!({ "confidence": 0.62 }));
     }
     let drifted_status = registry_b.check_and_update("sepsis-risk-v2.1", &monitor_b);
-    let drifted_str = match &drifted_status { Ok(s) => format!("{s:?}"), Err(_) => "error".to_string() };
+    let drifted_str = match &drifted_status {
+        Ok(s) => format!("{s:?}"),
+        Err(_) => "error".to_string(),
+    };
     let still_approved_b = registry_b.is_approved("sepsis-risk-v2.1");
 
     steps.push(PipelineStep {
@@ -1442,7 +1987,11 @@ fn run_sepsis_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDis
     });
     steps.push(PipelineStep {
         name: "Sub-case B: Phase 3 — Drifted".to_string(),
-        status: if !still_approved_b { StepStatus::Denied } else { StepStatus::Fail },
+        status: if !still_approved_b {
+            StepStatus::Denied
+        } else {
+            StepStatus::Fail
+        },
         detail: format!("{drifted_str} — approved={still_approved_b}"),
     });
 
@@ -1452,24 +2001,50 @@ fn run_sepsis_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDis
     let mut cap_list_revoked = cap_strs_revoked;
     cap_list_revoked.push("patient-vitals.read");
     let (_out_revoked, events_revoked, int_revoked, _verdict_revoked) = pipeline_step(
-        &SepsisRiskAgentRevoked, StepConfig {
-        policy_toml: MODEL_GOVERNANCE_POLICY, agent_id: "sepsis-risk-agent",
-        input_payload: json!({ "patient_id": "patient-701" }), input_kind: "sepsis-risk-request",
-        caps: &cap_list_revoked, schema: sepsis_risk_schema(), register_high_risk_rule: false,
-    });
+        &SepsisRiskAgentRevoked,
+        StepConfig {
+            policy_toml: MODEL_GOVERNANCE_POLICY,
+            agent_id: "sepsis-risk-agent",
+            input_payload: json!({ "patient_id": "patient-701" }),
+            input_kind: "sepsis-risk-request",
+            caps: &cap_list_revoked,
+            schema: sepsis_risk_schema(),
+            register_high_risk_rule: false,
+        },
+    );
     steps.push(PipelineStep {
         name: "Sub-case B: Phase 4 — Revoked Blocked".to_string(),
         status: StepStatus::Denied,
         detail: "score-risk | sepsis-model-revoked → Deny".to_string(),
     });
-    all_entries.push(AuditEntryDisplay { sequence: 0, hash_short: "── sub-case B ──".to_string(), kind: "label".to_string(), verified: int_revoked });
+    all_entries.push(AuditEntryDisplay {
+        sequence: 0,
+        hash_short: "── sub-case B ──".to_string(),
+        kind: "label".to_string(),
+        verified: int_revoked,
+    });
     for e in &events_revoked {
-        let kind = match &e.record.verdict { PolicyVerdict::Allow => "allow", PolicyVerdict::Deny { .. } => "deny", _ => "other" };
-        let is_genesis = e.sequence == 0 && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
-        all_entries.push(AuditEntryDisplay { sequence: e.sequence, hash_short: shorten_hash(&e.this_hash), kind: if is_genesis { "genesis".to_string() } else { kind.to_string() }, verified: int_revoked });
+        let kind = match &e.record.verdict {
+            PolicyVerdict::Allow => "allow",
+            PolicyVerdict::Deny { .. } => "deny",
+            _ => "other",
+        };
+        let is_genesis = e.sequence == 0
+            && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+        all_entries.push(AuditEntryDisplay {
+            sequence: e.sequence,
+            hash_short: shorten_hash(&e.this_hash),
+            kind: if is_genesis {
+                "genesis".to_string()
+            } else {
+                kind.to_string()
+            },
+            verified: int_revoked,
+        });
     }
 
-    let revocation_reason_b = registry_b.get("sepsis-risk-v2.1")
+    let revocation_reason_b = registry_b
+        .get("sepsis-risk-v2.1")
         .and_then(|m| match &m.provenance.approval_status {
             ApprovalStatus::Revoked { reason } => Some(reason.clone()),
             _ => None,
@@ -1477,11 +2052,31 @@ fn run_sepsis_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDis
         .unwrap_or_default();
 
     let extra_lines = vec![
-        ("Model".to_string(), "sepsis-risk-v2.1 (TabularToScore)".to_string(), Color::White),
-        ("Sub-case A".to_string(), format!("Stable: conf=0.89, drift={stable_str}"), Color::Green),
-        ("Sub-case B Warning".to_string(), format!("conf=0.78 → {warning_str}"), Color::Yellow),
-        ("Sub-case B Drifted".to_string(), format!("conf=0.62 → {drifted_str}, revoked={}", !still_approved_b), Color::Red),
-        ("Revocation".to_string(), truncate(&revocation_reason_b, 55), Color::Yellow),
+        (
+            "Model".to_string(),
+            "sepsis-risk-v2.1 (TabularToScore)".to_string(),
+            Color::White,
+        ),
+        (
+            "Sub-case A".to_string(),
+            format!("Stable: conf=0.89, drift={stable_str}"),
+            Color::Green,
+        ),
+        (
+            "Sub-case B Warning".to_string(),
+            format!("conf=0.78 → {warning_str}"),
+            Color::Yellow,
+        ),
+        (
+            "Sub-case B Drifted".to_string(),
+            format!("conf=0.62 → {drifted_str}, revoked={}", !still_approved_b),
+            Color::Red,
+        ),
+        (
+            "Revocation".to_string(),
+            truncate(&revocation_reason_b, 55),
+            Color::Yellow,
+        ),
     ];
 
     let capture = ExecutionCapture {
@@ -1490,7 +2085,10 @@ fn run_sepsis_model() -> (ExecutionCapture, Vec<PipelineStep>, Vec<AuditEntryDis
         resource: "sepsis-model".to_string(),
         capability_name: "model:approved + patient-vitals.read".to_string(),
         capability_granted: true,
-        output: last_out_a.map(|p| AgentOutput { kind: "sepsis-risk-result".to_string(), payload: p }),
+        output: last_out_a.map(|p| AgentOutput {
+            kind: "sepsis-risk-result".to_string(),
+            payload: p,
+        }),
         error: None,
         audit_events: vec![],
         chain_integrity: last_int_a && int_revoked,
@@ -1510,17 +2108,23 @@ fn drug_interaction_schema() -> OutputSchema {
             VerificationRule {
                 rule_id: "req-query".to_string(),
                 description: "Output must contain the queried drug pair".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "query".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "query".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-result".to_string(),
                 description: "Output must contain an interaction result".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "result".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "result".to_string(),
+                },
             },
             VerificationRule {
                 rule_id: "req-recommendation".to_string(),
                 description: "Output must contain a clinical recommendation".to_string(),
-                rule_type: VerificationRuleType::RequiredField { field_path: "recommendation".to_string() },
+                rule_type: VerificationRuleType::RequiredField {
+                    field_path: "recommendation".to_string(),
+                },
             },
         ],
     }
@@ -1550,7 +2154,11 @@ fn build_pipeline_steps(cap: &ExecutionCapture) -> Vec<PipelineStep> {
             format!("RequireVerification — check: {check_id}"),
         ),
     };
-    steps.push(PipelineStep { name: "Policy".to_string(), status: policy_status, detail: policy_detail });
+    steps.push(PipelineStep {
+        name: "Policy".to_string(),
+        status: policy_status,
+        detail: policy_detail,
+    });
 
     let (cap_status, cap_detail) = if matches!(
         cap.policy_verdict,
@@ -1558,24 +2166,56 @@ fn build_pipeline_steps(cap: &ExecutionCapture) -> Vec<PipelineStep> {
     ) {
         (StepStatus::Pending, "not reached".to_string())
     } else if matches!(&cap.error, Some(VeritasError::CapabilityMissing { .. })) {
-        (StepStatus::Fail, format!("{} [MISSING]", cap.capability_name))
+        (
+            StepStatus::Fail,
+            format!("{} [MISSING]", cap.capability_name),
+        )
     } else if cap.capability_granted {
-        (StepStatus::Pass, format!("{} [GRANTED]", cap.capability_name))
+        (
+            StepStatus::Pass,
+            format!("{} [GRANTED]", cap.capability_name),
+        )
     } else {
-        (StepStatus::Fail, format!("{} [NOT GRANTED]", cap.capability_name))
+        (
+            StepStatus::Fail,
+            format!("{} [NOT GRANTED]", cap.capability_name),
+        )
     };
-    steps.push(PipelineStep { name: "Capability".to_string(), status: cap_status, detail: cap_detail });
+    steps.push(PipelineStep {
+        name: "Capability".to_string(),
+        status: cap_status,
+        detail: cap_detail,
+    });
 
     let (agent_status, agent_detail) = if cap.output.is_some() {
-        (StepStatus::Pass, "propose() called, output produced".to_string())
-    } else if matches!(cap.policy_verdict, PolicyVerdict::Deny { .. } | PolicyVerdict::RequireApproval { .. }) {
-        (StepStatus::Pending, "propose() blocked by policy".to_string())
+        (
+            StepStatus::Pass,
+            "propose() called, output produced".to_string(),
+        )
+    } else if matches!(
+        cap.policy_verdict,
+        PolicyVerdict::Deny { .. } | PolicyVerdict::RequireApproval { .. }
+    ) {
+        (
+            StepStatus::Pending,
+            "propose() blocked by policy".to_string(),
+        )
     } else if matches!(&cap.error, Some(VeritasError::CapabilityMissing { .. })) {
-        (StepStatus::Pending, "propose() blocked by capability check".to_string())
+        (
+            StepStatus::Pending,
+            "propose() blocked by capability check".to_string(),
+        )
     } else {
-        (StepStatus::Fail, "propose() did not produce output".to_string())
+        (
+            StepStatus::Fail,
+            "propose() did not produce output".to_string(),
+        )
     };
-    steps.push(PipelineStep { name: "Agent".to_string(), status: agent_status, detail: agent_detail });
+    steps.push(PipelineStep {
+        name: "Agent".to_string(),
+        status: agent_status,
+        detail: agent_detail,
+    });
 
     let (verify_status, verify_detail) = if cap.output.is_some() {
         (StepStatus::Pass, "schema + rules: PASS".to_string())
@@ -1584,18 +2224,38 @@ fn build_pipeline_steps(cap: &ExecutionCapture) -> Vec<PipelineStep> {
     } else {
         (StepStatus::Pending, "not reached".to_string())
     };
-    steps.push(PipelineStep { name: "Verify".to_string(), status: verify_status, detail: verify_detail });
+    steps.push(PipelineStep {
+        name: "Verify".to_string(),
+        status: verify_status,
+        detail: verify_detail,
+    });
 
     let (audit_status, audit_detail) = if cap.audit_events.is_empty() {
         (StepStatus::Pending, "no events recorded".to_string())
     } else {
-        let integrity_str = if cap.chain_integrity { "VERIFIED" } else { "FAILED" };
+        let integrity_str = if cap.chain_integrity {
+            "VERIFIED"
+        } else {
+            "FAILED"
+        };
         (
-            if cap.chain_integrity { StepStatus::Pass } else { StepStatus::Fail },
-            format!("{} event(s), chain: {}", cap.audit_events.len(), integrity_str),
+            if cap.chain_integrity {
+                StepStatus::Pass
+            } else {
+                StepStatus::Fail
+            },
+            format!(
+                "{} event(s), chain: {}",
+                cap.audit_events.len(),
+                integrity_str
+            ),
         )
     };
-    steps.push(PipelineStep { name: "Audit".to_string(), status: audit_status, detail: audit_detail });
+    steps.push(PipelineStep {
+        name: "Audit".to_string(),
+        status: audit_status,
+        detail: audit_detail,
+    });
 
     steps
 }
@@ -1612,11 +2272,16 @@ fn build_audit_entries(cap: &ExecutionCapture) -> Vec<AuditEntryDisplay> {
                 PolicyVerdict::RequireVerification { .. } => "require-verify",
             };
             let is_genesis = e.sequence == 0
-                && e.prev_hash == "0000000000000000000000000000000000000000000000000000000000000000";
+                && e.prev_hash
+                    == "0000000000000000000000000000000000000000000000000000000000000000";
             AuditEntryDisplay {
                 sequence: e.sequence,
                 hash_short: shorten_hash(&e.this_hash),
-                kind: if is_genesis { "genesis".to_string() } else { kind.to_string() },
+                kind: if is_genesis {
+                    "genesis".to_string()
+                } else {
+                    kind.to_string()
+                },
                 verified: cap.chain_integrity,
             }
         })
@@ -1652,7 +2317,9 @@ fn ui(f: &mut Frame, app: &App) {
 }
 
 fn render_header(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
-    let title_style = Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+    let title_style = Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD);
     let mut spans: Vec<Span> = vec![Span::styled("VERITAS Healthcare Demo  ", title_style)];
 
     let scenarios = [
@@ -1666,15 +2333,23 @@ fn render_header(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     for (key, scenario) in &scenarios {
         let is_selected = app.selected == *scenario;
         let style = if is_selected {
-            Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
-        spans.push(Span::styled(format!("{} {}  ", key, scenario.name()), style));
+        spans.push(Span::styled(
+            format!("{} {}  ", key, scenario.name()),
+            style,
+        ));
     }
 
     let header = Paragraph::new(Line::from(spans)).block(
-        Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray)),
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::DarkGray)),
     );
     f.render_widget(header, area);
 }
@@ -1689,13 +2364,18 @@ fn render_pipeline(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     } else {
         "State: idle"
     };
-    items.push(ListItem::new(Line::from(Span::styled(state_str, Style::default().fg(Color::DarkGray)))));
+    items.push(ListItem::new(Line::from(Span::styled(
+        state_str,
+        Style::default().fg(Color::DarkGray),
+    ))));
     items.push(ListItem::new("")); // blank line
 
     let visible_count = app.animation_step.min(app.pipeline_steps.len());
 
     for (i, step) in app.pipeline_steps.iter().enumerate() {
-        if i >= visible_count { break; }
+        if i >= visible_count {
+            break;
+        }
 
         let (icon, status_label, status_color) = match &step.status {
             StepStatus::Pending => ("  ◦", "PENDING", Color::Yellow),
@@ -1708,8 +2388,16 @@ fn render_pipeline(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         let line = Line::from(vec![
             Span::styled(icon, Style::default().fg(Color::DarkGray)),
             Span::raw(format!(" {}: ", step.name)),
-            Span::styled(status_label, Style::default().fg(status_color).add_modifier(Modifier::BOLD)),
-            Span::styled(format!(" — {}", step.detail), Style::default().fg(Color::Gray)),
+            Span::styled(
+                status_label,
+                Style::default()
+                    .fg(status_color)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" — {}", step.detail),
+                Style::default().fg(Color::Gray),
+            ),
         ]);
         items.push(ListItem::new(line));
     }
@@ -1749,12 +2437,22 @@ fn render_audit_trail(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 _ => Color::Gray,
             };
             let check = if entry.verified { " ✓" } else { " ✗" };
-            let check_color = if entry.verified { Color::Green } else { Color::Red };
+            let check_color = if entry.verified {
+                Color::Green
+            } else {
+                Color::Red
+            };
 
             let line = Line::from(vec![
-                Span::styled(format!("  #{}", entry.sequence), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("  #{}", entry.sequence),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::raw(" ["),
-                Span::styled(entry.kind.as_str(), Style::default().fg(kind_color).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    entry.kind.as_str(),
+                    Style::default().fg(kind_color).add_modifier(Modifier::BOLD),
+                ),
                 Span::raw("] "),
                 Span::styled(entry.hash_short.as_str(), Style::default().fg(Color::Gray)),
                 Span::styled(check, Style::default().fg(check_color)),
@@ -1763,7 +2461,12 @@ fn render_audit_trail(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         }
 
         items.push(ListItem::new(""));
-        let (integrity_label, integrity_color) = if app.capture.as_ref().map(|c| c.chain_integrity).unwrap_or(false) {
+        let (integrity_label, integrity_color) = if app
+            .capture
+            .as_ref()
+            .map(|c| c.chain_integrity)
+            .unwrap_or(false)
+        {
             ("  Chain integrity: VERIFIED", Color::Green)
         } else if app.capture.is_some() {
             ("  Chain integrity: FAILED", Color::Red)
@@ -1772,7 +2475,9 @@ fn render_audit_trail(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         };
         items.push(ListItem::new(Span::styled(
             integrity_label,
-            Style::default().fg(integrity_color).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(integrity_color)
+                .add_modifier(Modifier::BOLD),
         )));
     }
 
@@ -1812,7 +2517,12 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     };
     lines.push(Line::from(vec![
         Span::styled("  Verdict:     ", Style::default().fg(Color::Gray)),
-        Span::styled(verdict_label, Style::default().fg(verdict_color).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            verdict_label,
+            Style::default()
+                .fg(verdict_color)
+                .add_modifier(Modifier::BOLD),
+        ),
     ]));
 
     lines.push(Line::from(vec![
@@ -1824,8 +2534,16 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         Span::raw(cap.resource.as_str()),
     ]));
 
-    let cap_color = if cap.capability_granted { Color::Green } else { Color::Red };
-    let cap_granted_label = if cap.capability_granted { "[GRANTED]" } else { "[NOT GRANTED]" };
+    let cap_color = if cap.capability_granted {
+        Color::Green
+    } else {
+        Color::Red
+    };
+    let cap_granted_label = if cap.capability_granted {
+        "[GRANTED]"
+    } else {
+        "[NOT GRANTED]"
+    };
     lines.push(Line::from(vec![
         Span::styled("  Capability:  ", Style::default().fg(Color::Gray)),
         Span::raw(format!("{} ", cap.capability_name)),
@@ -1848,7 +2566,11 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         let reason = match &cap.policy_verdict {
             PolicyVerdict::Deny { reason } => reason.clone(),
             PolicyVerdict::RequireApproval { reason, .. } => reason.clone(),
-            _ => cap.error.as_ref().map(|e| e.to_string()).unwrap_or_default(),
+            _ => cap
+                .error
+                .as_ref()
+                .map(|e| e.to_string())
+                .unwrap_or_default(),
         };
         if !reason.is_empty() {
             lines.push(Line::from(vec![
@@ -1858,7 +2580,9 @@ fn render_output(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         }
     }
 
-    let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: false });
     f.render_widget(paragraph, area);
 }
 
@@ -1874,7 +2598,9 @@ fn render_footer(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     ];
 
     let footer = Paragraph::new(Line::from(spans)).block(
-        Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray)),
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::DarkGray)),
     );
     f.render_widget(footer, area);
 }

@@ -19,10 +19,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 
-use veritas_contracts::{
-    DriftMonitor, DriftStatus,
-    error::{VeritasResult},
-};
+use veritas_contracts::{error::VeritasResult, DriftMonitor, DriftStatus};
 
 // ── DriftConfig ───────────────────────────────────────────────────────────────
 
@@ -91,9 +88,7 @@ impl DriftMonitor for InMemoryDriftMonitor {
         };
 
         let mut records = self.records.lock().expect("drift records lock poisoned");
-        let window = records
-            .entry(model_id.to_string())
-            .or_default();
+        let window = records.entry(model_id.to_string()).or_default();
 
         // Enforce rolling window size.
         if window.len() == self.config.window_size {
@@ -103,7 +98,10 @@ impl DriftMonitor for InMemoryDriftMonitor {
 
         // Set baseline once the window is full for the first time.
         if window.len() == self.config.window_size {
-            let mut baselines = self.baselines.lock().expect("drift baselines lock poisoned");
+            let mut baselines = self
+                .baselines
+                .lock()
+                .expect("drift baselines lock poisoned");
             if !baselines.contains_key(model_id) {
                 let avg = window.iter().sum::<f64>() / window.len() as f64;
                 baselines.insert(model_id.to_string(), avg);
@@ -114,7 +112,10 @@ impl DriftMonitor for InMemoryDriftMonitor {
     }
 
     fn check_drift(&self, model_id: &str) -> DriftStatus {
-        let baselines = self.baselines.lock().expect("drift baselines lock poisoned");
+        let baselines = self
+            .baselines
+            .lock()
+            .expect("drift baselines lock poisoned");
         let baseline = match baselines.get(model_id) {
             Some(&b) => b,
             // No baseline yet — not enough data to make a judgement.
@@ -171,7 +172,8 @@ mod tests {
 
     fn record_n(m: &InMemoryDriftMonitor, model_id: &str, confidence: f64, n: usize) {
         for _ in 0..n {
-            m.record(model_id, &json!({ "confidence": confidence })).unwrap();
+            m.record(model_id, &json!({ "confidence": confidence }))
+                .unwrap();
         }
     }
 
@@ -215,7 +217,11 @@ mod tests {
         record_n(&m, "model-c", 0.65, 5);
 
         match m.check_drift("model-c") {
-            DriftStatus::Drifted { metric, current, threshold } => {
+            DriftStatus::Drifted {
+                metric,
+                current,
+                threshold,
+            } => {
                 assert_eq!(metric, "confidence");
                 assert!((current - 0.65).abs() < 1e-9);
                 assert!((threshold - 0.2).abs() < 1e-9);
@@ -251,7 +257,8 @@ mod tests {
         // Results with no confidence field must succeed without error.
         m.record("model-e", &json!({ "label": "benign" })).unwrap();
         m.record("model-e", &json!({})).unwrap();
-        m.record("model-e", &json!({ "output": "some text" })).unwrap();
+        m.record("model-e", &json!({ "output": "some text" }))
+            .unwrap();
 
         // No baseline can have been established, so status must be Stable.
         assert_eq!(m.check_drift("model-e"), DriftStatus::Stable);

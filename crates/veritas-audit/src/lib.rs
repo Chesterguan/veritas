@@ -19,8 +19,8 @@
 //! writer.write(&step_record)?;
 //! writer.finalize("exec-001")?;
 //!
-//! assert!(writer.verify_integrity());
-//! let log = writer.export_log();
+//! assert!(writer.verify_integrity()?);
+//! let log = writer.export_log()?;
 //! ```
 
 pub mod chain;
@@ -77,7 +77,7 @@ mod tests {
         writer.write(&make_record(2, "third")).unwrap();
 
         assert!(
-            writer.verify_integrity(),
+            writer.verify_integrity().unwrap(),
             "chain must be valid after sequential writes"
         );
     }
@@ -100,7 +100,7 @@ mod tests {
         // The chain must now fail verification because event 0's this_hash
         // no longer matches the recomputed hash of its (mutated) record.
         assert!(
-            !writer.verify_integrity(),
+            !writer.verify_integrity().unwrap(),
             "chain must detect tampering with a stored event"
         );
     }
@@ -111,7 +111,7 @@ mod tests {
         let writer = InMemoryAuditWriter::new("exec-genesis");
         writer.write(&make_record(0, "first")).unwrap();
 
-        let log = writer.export_log();
+        let log = writer.export_log().unwrap();
         assert_eq!(log.events.len(), 1);
         assert_eq!(
             log.events[0].prev_hash,
@@ -128,7 +128,7 @@ mod tests {
         writer.write(&make_record(1, "b")).unwrap();
         writer.write(&make_record(2, "c")).unwrap();
 
-        let log = writer.export_log();
+        let log = writer.export_log().unwrap();
         for (idx, event) in log.events.iter().enumerate() {
             assert_eq!(
                 event.sequence, idx as u64,
@@ -145,7 +145,7 @@ mod tests {
         writer.write(&make_record(1, "beta")).unwrap();
         writer.write(&make_record(2, "gamma")).unwrap();
 
-        let log = writer.export_log();
+        let log = writer.export_log().unwrap();
 
         assert_eq!(log.execution_id, "exec-export");
         assert_eq!(log.events.len(), 3, "log must contain all written events");
@@ -159,7 +159,7 @@ mod tests {
 
         // Verify chain integrity on the exported log using the public helper.
         assert!(
-            super::verify_chain(&log.events),
+            super::verify_chain(&log.events).unwrap(),
             "exported log must pass chain verification"
         );
     }
@@ -169,13 +169,13 @@ mod tests {
     fn test_verify_empty() {
         let writer = InMemoryAuditWriter::new("exec-empty");
         assert!(
-            writer.verify_integrity(),
+            writer.verify_integrity().unwrap(),
             "an empty chain must be considered valid"
         );
 
         // Also verify via the public function directly.
         assert!(
-            super::verify_chain(&[]),
+            super::verify_chain(&[]).unwrap(),
             "verify_chain on empty slice must return true"
         );
     }

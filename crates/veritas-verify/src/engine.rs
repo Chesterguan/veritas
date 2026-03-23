@@ -167,9 +167,9 @@ impl Verifier for SchemaVerifier {
                 },
 
                 // ── ForbiddenPattern ──────────────────────────────────────────
-                // The field string value must not contain the forbidden pattern
-                // as a substring.  Non-string fields pass silently — the rule is
-                // only meaningful for string values.
+                // The field string value must not contain the forbidden substring.
+                // Non-string fields pass silently — the rule is only meaningful
+                // for string values.
                 VerificationRuleType::ForbiddenPattern {
                     field_path,
                     pattern,

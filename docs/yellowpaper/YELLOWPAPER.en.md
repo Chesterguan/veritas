@@ -1,8 +1,8 @@
 # VERITAS Yellow Paper — Technical Specification
 
-> Version 0.1 · 2026-02-27
+> Version 0.2 · 2026-03-18
 
-This document is the formal technical specification for the VERITAS runtime. It defines the type system, execution pipeline, policy engine semantics, audit trail construction, and verification protocol. For motivation, positioning, and design philosophy, see the [Whitepaper v0.3](../whitepaper/WHITEPAPER.en.md).
+This document is the formal technical specification for the VERITAS runtime. It defines the type system, execution pipeline, policy engine semantics, audit trail construction, verification protocol, and model governance layer. For motivation, positioning, and design philosophy, see the [Whitepaper v0.3](../whitepaper/WHITEPAPER.en.md).
 
 ---
 
@@ -14,10 +14,11 @@ This document is the formal technical specification for the VERITAS runtime. It 
 4. [Policy Engine](#4-policy-engine)
 5. [Audit Trail](#5-audit-trail)
 6. [Verification Engine](#6-verification-engine)
-7. [Security Properties](#7-security-properties)
-8. [State Machine](#8-state-machine)
-9. [Healthcare Reference Walkthrough](#9-healthcare-reference-walkthrough)
-10. [Appendix: Crate Dependency Graph](#10-appendix-crate-dependency-graph)
+7. [Model Governance](#7-model-governance)
+8. [Security Properties](#8-security-properties)
+9. [State Machine](#9-state-machine)
+10. [Healthcare Reference Walkthrough](#10-healthcare-reference-walkthrough)
+11. [Appendix: Crate Dependency Graph](#11-appendix-crate-dependency-graph)
 
 ---
 
@@ -65,6 +66,8 @@ AgentOutput {
 }
 ```
 
+In the target architecture, model invocation outputs include `ModelInvocationMetadata` (see §1.7) in the payload, enabling full provenance in audit records. This metadata originates from the trusted `ModelRegistry`, not from the agent.
+
 ### 1.2 Capability-Based Access Control
 
 ```
@@ -80,6 +83,8 @@ CapabilitySet {
 ```
 
 Methods: `grant(cap)`, `has(&cap) -> bool`, `all() -> Iterator`. Capabilities are granted at startup by the hosting application and **never elevated at runtime**.
+
+Model governance extends this: the `ModelRegistry` auto-generates `"model:<id>"` and `"model:approved"` capabilities for registered, approved models (see §7.1).
 
 ### 1.3 Policy Verdict and Context
 
@@ -176,15 +181,77 @@ VeritasError
     | StateMachineError { reason }
     | ConfigError { reason }
     | SchemaValidation { reason }
+    | InvalidInput { reason }               // malformed or unacceptable input
 ```
 
 All fallible operations return `VeritasResult<T> = Result<T, VeritasError>`.
+
+### 1.7 Model Governance Types
+
+Defined in `veritas-contracts`. Used by `veritas-model` and downstream crates.
+
+```
+ModelModality
+    | TextToText          // LLMs (Claude, GPT, Ollama)
+    | ImageToText         // Vision models (radiology reports, pathology)
+    | ImageToLabel        // Classification (skin lesion, retinal scan)
+    | TabularToScore      // Risk scores (sepsis, readmission)
+    | TimeSeriesToAlert   // Monitoring (ECG, vitals trend)
+    | MultiModal          // Combined input types
+    | Custom(String)      // Extensible
+```
+
+```
+ApprovalStatus
+    | Approved
+    | Pending
+    | Revoked { reason: String }
+    | Experimental        // allowed in non-production environments only
+```
+
+```
+ModelProvenance {
+    vendor:              String,                  // "anthropic", "internal", "huggingface"
+    training_data_hash:  Option<String>,          // reproducibility
+    approval_status:     ApprovalStatus,
+    approved_by:         Option<String>,          // governance chain
+    approved_at:         Option<String>,          // ISO 8601 string (no chrono dependency)
+    regulatory_class:    Option<String>,          // "FDA-510k", "CE-IVD", "research-only"
+}
+```
+
+```
+TokenUsage {
+    input_tokens:  u64,
+    output_tokens: u64,
+}
+```
+
+```
+ModelInvocationMetadata {
+    model_id:          String,
+    model_version:     String,
+    modality:          ModelModality,
+    confidence:        Option<f64>,       // model self-reported confidence
+    latency_ms:        u64,
+    provenance_summary: String,           // condensed from ModelProvenance for audit
+}
+```
+
+`ModelInvocationMetadata` is designed to be attached to `AgentOutput.payload` when an agent invokes a registered model, ensuring audit records contain full model provenance without widening the `AgentOutput` struct. In the target architecture (see §3), the Executor populates this from the trusted `ModelRegistry` rather than relying on agent self-reporting.
+
+```
+DriftStatus
+    | Stable
+    | Warning { metric: String, current: f64, threshold: f64 }
+    | Drifted { metric: String, current: f64, threshold: f64 }
+```
 
 ---
 
 ## 2. Trait Interfaces
 
-Four traits define the complete trust boundary. Defined in `veritas-core/src/traits.rs`.
+Seven traits define the complete trust boundary. Agent, PolicyEngine, AuditWriter, and Verifier are defined in `veritas-core/src/traits.rs`. ModelDescriptor, ModelCapability, and DriftMonitor are defined in `veritas-contracts` and implemented in `veritas-model`.
 
 ### 2.1 Agent (untrusted)
 
@@ -237,6 +304,42 @@ trait Verifier: Send + Sync {
 
 Inspects raw `AgentOutput` against a declarative `OutputSchema`. Must not call agent logic.
 
+### 2.5 ModelDescriptor (trusted)
+
+```rust
+trait ModelDescriptor: Send + Sync {
+    fn model_id(&self) -> &str;
+    fn modality(&self) -> &ModelModality;
+    fn version(&self) -> &str;
+    fn provenance(&self) -> &ModelProvenance;
+}
+```
+
+Describes a model registered in the trusted `ModelRegistry`. Implemented by `RegisteredModel` in `veritas-model`. The registry accepts models with any `ApprovalStatus` — it is `capabilities_for()` that withholds `"model:approved"` for non-Approved models (see §7.1).
+
+### 2.6 DriftMonitor (trusted)
+
+```rust
+trait DriftMonitor: Send + Sync {
+    fn record(&self, model_id: &str, result: &serde_json::Value) -> VeritasResult<()>;
+    fn check_drift(&self, model_id: &str) -> DriftStatus;
+}
+```
+
+Monitors model behavior over time. `record()` accumulates invocation results; `check_drift()` compares current statistics against the registered baseline. Reference implementation: `InMemoryDriftMonitor` in `veritas-model`. See §7.2 for semantics.
+
+### 2.7 ModelCapability (untrusted)
+
+```rust
+trait ModelCapability: Send + Sync {
+    fn descriptor(&self) -> &dyn ModelDescriptor;
+    fn invoke(&self, input: &serde_json::Value) -> VeritasResult<ModelResult<serde_json::Value>>;
+    fn validate_input(&self, input: &serde_json::Value) -> VeritasResult<()>;
+}
+```
+
+Wraps a concrete model backend behind an object-safe interface. Uses `serde_json::Value` for input/output so `Box<dyn ModelCapability>` is valid. Classified as **untrusted** because `invoke()` delegates to an external model — outputs must still pass through the Verifier. Currently defined in `veritas-contracts`; no implementors exist yet in the codebase. In the target architecture (see §3), invocation will be mediated by the Executor rather than called directly by agents.
+
 ---
 
 ## 3. Execution Pipeline
@@ -248,9 +351,12 @@ struct Executor {
     policy:   Box<dyn PolicyEngine>,
     audit:    Box<dyn AuditWriter>,
     verifier: Box<dyn Verifier>,
+    registry: Option<Arc<ModelRegistry>>,  // model governance
     schema:   OutputSchema,
 }
 ```
+
+> **Note:** The `registry` field integration into the Executor is the target architecture defined by the [ModelCapability RFC](../rfc-model-capability.md). The current implementation provides `ModelRegistry` as a standalone trusted component; full Executor integration is planned.
 
 ### 3.1 The `step()` Algorithm
 
@@ -398,8 +504,16 @@ required_capabilities = ["drug-database.read"]
 verdict = "allow"
 
 [[rules]]
+id = "allow-summarize-clinical-notes"
+description = "Agent may summarize clinical notes when it holds clinical-notes.read"
+action = "summarize"
+resource = "clinical-notes"
+required_capabilities = ["clinical-notes.read"]
+verdict = "allow"
+
+[[rules]]
 id = "deny-patient-query-no-consent"
-description = "Block AI queries when patient has not consented"
+description = "Patient record queries are unconditionally denied when consent flag is absent"
 action = "query"
 resource = "patient-records-no-consent"
 verdict = "deny"
@@ -443,6 +557,48 @@ verdict = "allow"
 ```
 
 Note: `deny-uncovered-procedure` must appear before `allow-insurance-eligibility-check` because both match `action = "check-coverage"`. First-match-wins ensures the deny rule fires when `resource = "uncovered-procedure"`.
+
+### 4.6 Model Governance Policy
+
+Model approval is enforced through ordinary policy rules that require the `model:approved` capability. The `ModelRegistry` generates this capability automatically for models with `ApprovalStatus::Approved`.
+
+```toml
+# policies/model_governance.toml — scenarios 6–7
+
+[[rules]]
+id = "allow-radiology-inference-approved"
+description = "Approved radiology models may run clinical inference"
+action = "run-inference"
+resource = "radiology-model"
+required_capabilities = ["model:approved", "radiology.read"]
+verdict = "allow"
+
+[[rules]]
+id = "deny-radiology-inference-unapproved"
+description = "Unapproved radiology models are blocked from clinical inference"
+action = "run-inference"
+resource = "radiology-model-unapproved"
+verdict = "deny"
+deny_reason = "model not approved for clinical use: FDA 510(k) clearance required"
+
+[[rules]]
+id = "allow-sepsis-scoring-approved"
+description = "Approved sepsis risk model may score patient vitals"
+action = "score-risk"
+resource = "sepsis-model"
+required_capabilities = ["model:approved", "patient-vitals.read"]
+verdict = "allow"
+
+[[rules]]
+id = "deny-sepsis-scoring-revoked"
+description = "Revoked or unapproved sepsis model is blocked from scoring"
+action = "score-risk"
+resource = "sepsis-model-revoked"
+verdict = "deny"
+deny_reason = "model has been revoked: drift detected, human review required before re-activation"
+```
+
+This design is backwards compatible: existing opaque capability strings (`"phi:read"`, `"order:submit"`) are unaffected. Model governance is additive.
 
 ---
 
@@ -617,15 +773,98 @@ report = {
 
 ---
 
-## 7. Security Properties
+## 7. Model Governance
 
-Ten invariants the runtime enforces:
+Model governance is implemented in the `veritas-model` crate. It sits alongside the core runtime as a trusted component — not in the agent path, not in the LLM. The trust level is the same as `PolicyEngine`.
+
+### 7.1 ModelRegistry
+
+`ModelRegistry` is the single source of truth for which models are permitted to operate.
+
+```rust
+struct ModelRegistry {
+    models: HashMap<String, RegisteredModel>,
+}
+```
+
+`RegisteredModel` is a concrete type implementing `ModelDescriptor` with fields: `model_id`, `modality`, `version`, `provenance`.
+
+**Operations:**
+
+| Method | Behavior |
+|--------|----------|
+| `register(model: RegisteredModel)` | Adds a model. Fails if `model_id` is already registered. |
+| `revoke(model_id, reason)` | Updates the model's `ApprovalStatus` to `Revoked { reason }`. |
+| `is_approved(model_id)` | Returns true only for `ApprovalStatus::Approved`. |
+| `by_modality(modality)` | Lists all registered models of a given modality. |
+| `capabilities_for(model_id)` | Generates capabilities for policy evaluation (see below). |
+
+**Capability generation.** For a model with `ApprovalStatus::Approved`, `capabilities_for()` returns:
+
+```
+["model:<model_id>", "model:approved"]
+```
+
+For non-approved models (Pending, Experimental, Revoked), only `"model:<model_id>"` is returned — the `"model:approved"` capability is withheld. Policy rules that require `"model:approved"` will deny access, even if the model is registered.
+
+This means approval status flows into the standard `CapabilitySet` mechanism. No special handling is required in the executor.
+
+### 7.2 Drift Detection
+
+`InMemoryDriftMonitor` implements the `DriftMonitor` trait using a rolling window over recent invocation results.
+
+**Configuration (`DriftConfig`):**
+
+```
+window_size:        usize    // number of recent results to retain (must be > 0)
+warning_threshold:  f64      // e.g. 0.10 = 10 pp drop triggers Warning
+drift_threshold:    f64      // e.g. 0.20 = 20 pp drop triggers Drifted
+```
+
+The baseline is **not configured** — it is computed automatically as the mean confidence of the first complete window of observations. Once set, the baseline is fixed and never updated.
+
+**Semantics:**
+
+1. `record(model_id, result)` extracts the `"confidence"` field from the JSON result. If absent, the call is a silent no-op. The value is appended to the model's rolling window, evicting the oldest entry when the window is full. When the window first reaches `window_size`, the baseline is set as the mean of that window.
+2. `check_drift(model_id)` computes `drop = baseline - current_window_mean`:
+   - `drop < warning_threshold` → `DriftStatus::Stable`
+   - `warning_threshold ≤ drop < drift_threshold` → `DriftStatus::Warning { metric: "confidence", current, threshold }`
+   - `drop ≥ drift_threshold` → `DriftStatus::Drifted { metric: "confidence", current, threshold }`
+3. Models with no baseline (not enough data) or unknown model IDs return `DriftStatus::Stable`.
+
+### 7.3 Auto-Revocation
+
+`registry.check_and_update(model_id, &monitor)` combines drift detection with registry mutation. It is a method on `ModelRegistry` that takes a `&dyn DriftMonitor`:
+
+```
+status = monitor.check_drift(model_id)
+if status == Drifted:
+    registry.revoke(model_id, "auto-revoked: model drift detected")
+    return Drifted
+return status
+```
+
+After auto-revocation, `registry.capabilities_for(model_id)` no longer returns `"model:approved"`. Any subsequent policy evaluation for that model will fail the capability check without additional configuration. The revocation is recorded in the registry's model provenance and appears in downstream audit records.
+
+### 7.4 Trust Boundary
+
+`ModelRegistry` is a **trusted** component. It holds the same trust level as `PolicyEngine` and `AuditWriter`.
+
+This matters because model metadata in policy evaluation and audit records originates from the registry, not from the agent. An agent cannot self-report its own model identity to obtain approval — the capability grant comes exclusively from the registry. An LLM-backed agent that claims to be using an approved model but is actually using a different model cannot forge the `"model:approved"` capability, because capabilities are granted by the runtime at startup from the registry, not by the agent at runtime.
+
+The registry itself is not network-accessible during execution. It is loaded once at startup, like policy rules.
+
+---
+
+## 8. Security Properties
+
+Twelve invariants the runtime enforces:
 
 **INV-1: Structural proposal gate.** `Agent::propose()` is only reachable after `PolicyEngine::evaluate()` returns `Allow` (or `RequireVerification`) AND all `Agent::required_capabilities()` are present in the `CapabilitySet`. This is enforced by control flow — `propose()` appears after the match arms for Deny and RequireApproval return early.
 
 **INV-2: Step counter monotonicity.** `AgentState.step` is incremented by exactly 1 on each transition. The `Agent::transition()` contract requires this.
 
-**INV-3: Audit completeness.** Every step produces exactly one `StepRecord`. Denials, suspensions, and successes are all audited.
+**INV-3: Audit completeness.** Every step produces exactly one `StepRecord`. Denials, suspensions, successes, verification failures, and agent errors are all audited.
 
 **INV-4: Audit immutability.** Records are append-only. The audit writer never modifies or deletes records. The hash chain cryptographically enforces this.
 
@@ -641,6 +880,10 @@ Ten invariants the runtime enforces:
 
 **INV-10: No capability elevation.** Capabilities are granted at startup and never added, modified, or elevated during execution.
 
+**INV-11: Model approval gate.** Models must be registered with `ApprovalStatus::Approved` in the `ModelRegistry` to receive the `"model:approved"` capability. Experimental, Pending, and Revoked models are structurally denied by the capability mechanism — no special-case logic is required.
+
+**INV-12: Trusted model identity.** Model metadata in policy evaluation and audit records originates from the trusted `ModelRegistry`, not from agent self-reporting. An agent cannot forge model identity to obtain approval capabilities.
+
 ### Trust Boundary
 
 | Trusted | Untrusted |
@@ -649,14 +892,15 @@ Ten invariants the runtime enforces:
 | PolicyEngine | Tools |
 | AuditWriter | Input data |
 | Verifier | External environment |
+| ModelRegistry | LLM outputs |
 
-The trusted computing base is four components. Everything else is untrusted by default.
+The trusted computing base is five components. Everything else is untrusted by default.
 
 ---
 
-## 8. State Machine
+## 9. State Machine
 
-### 8.1 Transition Diagram
+### 9.1 Transition Diagram
 
 ```
                             step()
@@ -694,7 +938,7 @@ The trusted computing base is four components. Everything else is untrusted by d
                                                     └─ no  → Transitioned (continue)
 ```
 
-### 8.2 Terminal States
+### 9.2 Terminal States
 
 - `StepResult::Denied` — policy denied; execution ends.
 - `StepResult::Complete` — agent reached terminal state; execution ends.
@@ -702,21 +946,21 @@ The trusted computing base is four components. Everything else is untrusted by d
 - `Err(VerificationFailed)` — output rejected; execution ends.
 - `Err(AuditWriteFailed)` — fatal; execution ends.
 
-### 8.3 Suspended State
+### 9.3 Suspended State
 
 - `StepResult::AwaitingApproval` — execution paused. The caller must persist `suspended_state`, obtain approval from the specified `approver_role`, and resume by calling `step()` with an `AgentInput { kind: "approval_granted", ... }` carrying the approval token.
 
-### 8.4 Continuing State
+### 9.4 Continuing State
 
 - `StepResult::Transitioned` — call `step()` again with `next_state` and the next `AgentInput`.
 
 ---
 
-## 9. Healthcare Reference Walkthrough
+## 10. Healthcare Reference Walkthrough
 
-Five scenarios demonstrate end-to-end VERITAS enforcement. All are implemented in `veritas-ref-healthcare/src/scenarios/`.
+Seven scenarios demonstrate end-to-end VERITAS enforcement. Scenarios 1–5 are implemented in `veritas-ref-healthcare/src/scenarios/`. Scenarios 6–7 use `veritas-model` in addition.
 
-### 9.1 Scenario 1: Drug Interaction Checker
+### 10.1 Scenario 1: Drug Interaction Checker
 
 Demonstrates the Allow flow with output verification.
 
@@ -733,7 +977,11 @@ Input: drug_a="warfarin", drug_b="aspirin"
 8. is_terminal → true → audit.finalize → Complete
 ```
 
-### 9.2 Scenario 3: Patient Data Query (Three Sub-cases)
+### 10.2 Scenario 2: Clinical Note Summarizer
+
+Demonstrates PII detection via a custom verification rule. The agent summarizes a clinical note; the verifier checks for forbidden patterns (e.g., SSN, phone numbers) in the output. If PII is detected → `Err(VerificationFailed)`.
+
+### 10.3 Scenario 3: Patient Data Query (Three Sub-cases)
 
 Demonstrates all three enforcement layers.
 
@@ -743,7 +991,7 @@ Demonstrates all three enforcement layers.
 
 **Sub-case C: Policy deny.** Patient lacks consent. Agent dynamically routes `resource = "patient-records-no-consent"`, which matches the deny rule. Policy returns `Deny`. Agent's `propose()` is never called.
 
-### 9.3 Scenario 4: Multi-Agent Clinical Pipeline
+### 10.4 Scenario 4: Multi-Agent Clinical Pipeline
 
 Four agents execute sequentially, each with its own Executor and audit chain:
 
@@ -755,7 +1003,7 @@ Each agent's verified output feeds the next agent's input. Stage 4 includes a cu
 
 Four independent audit chains are produced and verified for integrity.
 
-### 9.4 Scenario 5: Prior Authorization Workflow
+### 10.5 Scenario 5: Prior Authorization Workflow
 
 Demonstrates the `RequireApproval` lifecycle.
 
@@ -781,9 +1029,72 @@ Step 3 (if covered): PASubmissionAgent
   → agent.propose() → { pa_reference: "PA-2026-0218-4471", status: "submitted" }
 ```
 
+### 10.6 Scenario 6: Radiology AI Model Governance
+
+Demonstrates the `ModelRegistry` approval gate with an `ImageToLabel` model.
+
+```
+Model: chest-xray-v3.2
+  ApprovalStatus: Approved
+  regulatory_class: "FDA-510k"
+  capabilities_for → ["model:chest-xray-v3.2", "model:approved"]
+```
+
+**Sub-case A: Approved model.** `CapabilitySet` includes `"model:approved"` and `"radiology.read"`. Policy rule `allow-radiology-inference-approved` allows. Agent invokes model via `propose()`. Audit record captures the step.
+
+**Sub-case B: Experimental model blocked.**
+
+```
+Model: chest-xray-v4.0-beta
+  ApprovalStatus: Experimental
+  capabilities_for → ["model:chest-xray-v4.0-beta"]  // no "model:approved"
+```
+
+The agent's `describe_action()` returns resource `"radiology-model-unapproved"`, which routes to the explicit `deny-radiology-inference-unapproved` policy rule. Policy returns `Deny` with reason "model not approved for clinical use: FDA 510(k) clearance required". `propose()` is never called.
+
+**Sub-case C: Drift detected → auto-revoke → deny.**
+
+```
+1. InMemoryDriftMonitor accumulates confidence scores for chest-xray-v3.2
+2. Rolling mean drops below drift_threshold
+3. check_and_update() calls registry.revoke("chest-xray-v3.2", "auto-revoked: model drift detected")
+4. capabilities_for("chest-xray-v3.2") → ["model:chest-xray-v3.2"]  // "model:approved" withheld
+5. Next step: capability check fails → Deny
+6. Revocation reason appears in audit record
+```
+
+### 10.7 Scenario 7: Sepsis Risk Model with Drift
+
+Demonstrates `TabularToScore` model governance and the full drift lifecycle.
+
+```
+Model: sepsis-risk-v2.1
+  ApprovalStatus: Approved
+  modality: TabularToScore
+  (baseline auto-computed from first window of observations)
+```
+
+**Sub-case A: Stable operation.** Confidence scores in rolling window remain within `warning_threshold` of baseline. `DriftStatus::Stable`. Policy allows on each step.
+
+**Sub-case B: Confidence degrades → auto-revoke → deny.**
+
+```
+1. Baseline established: 5 invocations at confidence 0.89
+2. Phase 2: 5 invocations at confidence 0.78 (drop ≈ 0.11 > warning_threshold 0.10)
+   → check_drift → DriftStatus::Warning; model remains approved (Warning does not auto-revoke)
+3. Phase 3: 5 invocations at confidence 0.62 (drop = 0.27 > drift_threshold 0.20)
+4. check_drift → DriftStatus::Drifted
+5. check_and_update() → registry.revoke("sepsis-risk-v2.1", "auto-revoked: model drift detected")
+6. Phase 4: SepsisRiskAgentRevoked routes to resource "sepsis-model-revoked"
+7. Policy rule deny-sepsis-scoring-revoked → Deny
+8. Human review required before re-approval and re-registration
+```
+
+The Warning phase provides an observation window before irreversible revocation. Only `Drifted` triggers auto-revocation.
+
 ---
 
-## 10. Appendix: Crate Dependency Graph
+## 11. Appendix: Crate Dependency Graph
 
 ```
 veritas-contracts          (no dependencies — shared types only)
@@ -793,18 +1104,22 @@ veritas-contracts          (no dependencies — shared types only)
     │       ├── veritas-policy       (TomlPolicyEngine impl PolicyEngine)
     │       ├── veritas-audit        (InMemoryAuditWriter impl AuditWriter)
     │       └── veritas-verify       (SchemaVerifier impl Verifier)
-    │               │
-    │               └── veritas-ref-healthcare   (5 scenarios, 3 policy files)
-    │                       │
-    │                       ├── demo             (CLI runner, clap)
-    │                       └── tui              (interactive TUI, ratatui)
+    │
+    ├── veritas-model      (ModelRegistry, InMemoryDriftMonitor)
+    │
+    ├── veritas-ref-healthcare   (7 scenarios, 4 policy files)
+    │       │  depends on: veritas-core, veritas-policy, veritas-audit,
+    │       │              veritas-verify, veritas-model
+    │       │
+    │       ├── demo             (CLI runner, clap)
+    │       └── tui              (interactive TUI, ratatui + veritas-model)
     │
     └── (all crates depend on veritas-contracts)
 ```
 
-**Workspace:** 8 members. **Tests:** 58 across all crates.
+**Workspace:** 9 members. **Tests:** 109 across all crates.
 
 ---
 
-*VERITAS Yellow Paper v0.1 — 2026-02-27*
+*VERITAS Yellow Paper v0.2 — 2026-03-18*
 *Licensed under Apache License 2.0*

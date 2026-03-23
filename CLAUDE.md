@@ -43,18 +43,18 @@ Think: Red Hat is to Linux what VERITAS is to ZeroClaw/OpenClaw.
 
 ```
 crates/
-  veritas-contracts/       # Shared types, traits, error types (15 tests)
-  veritas-core/            # Executor pipeline (6 tests)
+  veritas-contracts/       # Shared types, traits, error types (27 tests)
+  veritas-core/            # Executor pipeline (9 tests)
   veritas-policy/          # TOML deny-by-default policy engine (8 tests)
   veritas-audit/           # SHA-256 hash-chained audit trail (6 tests)
   veritas-verify/          # JSON Schema + semantic rule verification (10 tests)
-  veritas-model/           # Model registry, drift detection, model governance
-  veritas-ref-healthcare/  # Healthcare reference runtime (7 scenarios, 13+ tests)
+  veritas-model/           # Model registry, drift detection, model governance (31 tests)
+  veritas-ref-healthcare/  # Healthcare reference runtime (7 scenarios, 40 tests)
 
 demo/                      # CLI demo runner (clap)
 tui/                       # Interactive TUI demo (ratatui 0.29 + crossterm 0.28)
 assets/                    # Logo and demo GIF
-docs/                      # Whitepaper v0.3 (EN, ZH, JA, FR)
+docs/                      # Whitepaper v0.3 (EN, ZH, JA, FR), Yellow Paper v0.2, RFC
 ```
 
 ## Core Components

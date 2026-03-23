@@ -5,8 +5,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License">
   <img src="https://github.com/Chesterguan/veritas/actions/workflows/ci.yml/badge.svg" alt="Build">
-  <img src="https://img.shields.io/badge/tests-109%20passing-green" alt="Tests">
-  <img src="https://img.shields.io/badge/rust-1.78%2B-orange" alt="Rust">
+  <img src="https://img.shields.io/badge/tests-131%20passing-green" alt="Tests">
+  <img src="https://img.shields.io/badge/rust-1.85%2B-orange" alt="Rust">
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@ Lightweight, deterministic, policy-bound, auditable, and verifiable execution ru
 ```bash
 git clone https://github.com/Chesterguan/veritas.git
 cd veritas
-cargo test --workspace       # 109 tests, all passing
+cargo test --workspace       # 131 tests, all passing
 cargo run -p demo -- run-all # run all 7 healthcare scenarios
 ```
 
@@ -40,7 +40,7 @@ cargo run -p veritas-tui
 
 The TUI lets you select scenarios (1, 4, 5, 6, 7) and watch VERITAS enforce policy, model governance, and drift detection in real time.
 
-**Prerequisites:** Rust 1.78+ ([install](https://rustup.rs/))
+**Prerequisites:** Rust 1.85+ ([install](https://rustup.rs/))
 
 ## Why VERITAS
 
@@ -81,12 +81,12 @@ State → Policy → Capability → Audit → Verify → Next State
 | Crate | Purpose | Tests |
 |-------|---------|-------|
 | [`veritas-contracts`](crates/veritas-contracts) | Shared types, traits, error types | 27 |
-| [`veritas-core`](crates/veritas-core) | Deterministic executor pipeline | 6 |
+| [`veritas-core`](crates/veritas-core) | Deterministic executor pipeline | 9 |
 | [`veritas-policy`](crates/veritas-policy) | TOML deny-by-default policy engine | 8 |
 | [`veritas-audit`](crates/veritas-audit) | SHA-256 hash-chained audit trail | 6 |
 | [`veritas-verify`](crates/veritas-verify) | JSON Schema + semantic rule verification | 10 |
-| [`veritas-model`](crates/veritas-model) | Model registry, drift detection, model governance | 25 |
-| [`veritas-ref-healthcare`](crates/veritas-ref-healthcare) | Healthcare reference runtime (7 scenarios) | 27 |
+| [`veritas-model`](crates/veritas-model) | Model registry, drift detection, model governance | 31 |
+| [`veritas-ref-healthcare`](crates/veritas-ref-healthcare) | Healthcare reference runtime (7 scenarios) | 40 |
 
 ## Healthcare Demo Scenarios
 
@@ -142,7 +142,7 @@ demo/                      # CLI demo runner (clap)
 tui/                       # Interactive TUI demo (ratatui)
 docs/
   whitepaper/              # Whitepaper v0.3 (EN, ZH, JA, FR)
-  yellowpaper/             # Yellow Paper v0.1 (EN)
+  yellowpaper/             # Yellow Paper v0.2 (EN)
 ```
 
 ## Documentation
@@ -150,7 +150,7 @@ docs/
 | Document | Description |
 |----------|-------------|
 | [Whitepaper v0.3](docs/whitepaper/WHITEPAPER.en.md) | Vision, design philosophy, system architecture |
-| [Yellow Paper v0.1](docs/yellowpaper/YELLOWPAPER.en.md) | Formal execution semantics and specifications |
+| [Yellow Paper v0.2](docs/yellowpaper/YELLOWPAPER.en.md) | Formal execution semantics and specifications |
 | [docs/](docs/README.md) | Full documentation index |
 
 ### Whitepaper Translations

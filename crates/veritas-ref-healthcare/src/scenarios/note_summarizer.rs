@@ -238,10 +238,10 @@ pub fn run_scenario() -> VeritasResult<()> {
             println!("  PII label check:        PASS (no forbidden labels detected)");
             println!("  Verification result:    PASS");
             println!("  Notes summarized:       {note_count}");
-            println!(
-                "  Summary preview:        {}...",
-                &summary[..summary.len().min(120)]
-            );
+            // Truncate at a character boundary to avoid a panic on multi-byte
+            // UTF-8 sequences that straddle the byte-index limit.
+            let preview: String = summary.chars().take(120).collect();
+            println!("  Summary preview:        {preview}...");
         }
         StepResult::Denied { reason, .. } => {
             println!("  DENIED: {reason}");
@@ -255,8 +255,8 @@ pub fn run_scenario() -> VeritasResult<()> {
 
     // ── Verify audit chain integrity ──────────────────────────────────────────
 
-    let integrity_ok = audit_inner.verify_integrity();
-    let log = audit_inner.export_log();
+    let integrity_ok = audit_inner.verify_integrity().unwrap_or(false);
+    let log = audit_inner.export_log().unwrap();
 
     println!(
         "  Audit chain integrity:  {} ({} event(s) in chain)",
@@ -268,4 +268,132 @@ pub fn run_scenario() -> VeritasResult<()> {
     println!();
 
     Ok(())
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use veritas_contracts::{
+        agent::AgentOutput,
+        policy::{PolicyContext, PolicyVerdict},
+    };
+    use veritas_core::traits::{PolicyEngine, Verifier};
+
+    fn make_policy_ctx(action: &str, resource: &str, caps: &[&str]) -> PolicyContext {
+        PolicyContext {
+            agent_id: "test-agent".to_string(),
+            execution_id: "test-exec".to_string(),
+            current_phase: "active".to_string(),
+            action: action.to_string(),
+            resource: resource.to_string(),
+            capabilities: caps.iter().map(|s| s.to_string()).collect(),
+            metadata: serde_json::Value::Null,
+        }
+    }
+
+    /// Policy allows summarization when the agent holds clinical-notes.read.
+    #[test]
+    fn test_policy_allows_summarize() {
+        let policy = TomlPolicyEngine::from_toml_str(HEALTHCARE_POLICY).unwrap();
+        let ctx = make_policy_ctx("summarize", "clinical-notes", &["clinical-notes.read"]);
+        assert_eq!(policy.evaluate(&ctx).unwrap(), PolicyVerdict::Allow);
+    }
+
+    /// Deny-by-default: summarize is denied when the required capability is absent.
+    #[test]
+    fn test_policy_denies_without_capability() {
+        let policy = TomlPolicyEngine::from_toml_str(HEALTHCARE_POLICY).unwrap();
+        let ctx = make_policy_ctx("summarize", "clinical-notes", &[]);
+        match policy.evaluate(&ctx).unwrap() {
+            PolicyVerdict::Deny { .. } => {}
+            other => panic!("expected Deny, got {other:?}"),
+        }
+    }
+
+    /// The no-pii-labels custom rule rejects a summary containing a forbidden label.
+    #[test]
+    fn test_pii_detection_catches_forbidden_labels() {
+        let mut verifier = SchemaVerifier::new();
+        verifier.register_rule(
+            "no-pii-labels",
+            Box::new(|payload| {
+                let summary = payload["summary"].as_str().unwrap_or("");
+                let forbidden = ["DOB:", "SSN:", "MRN:", "Date of Birth:"];
+                for label in &forbidden {
+                    if summary.contains(label) {
+                        return Some(format!(
+                            "summary contains forbidden PII label '{label}'; remove before delivery"
+                        ));
+                    }
+                }
+                None
+            }),
+        );
+
+        // Payload deliberately leaks a DOB label — verifier must catch it.
+        let output = AgentOutput {
+            kind: "clinical-summary".to_string(),
+            payload: json!({
+                "patient_id": "patient-042",
+                "note_count": 2,
+                "summary": "Patient summary. DOB: 1965-04-12. No other findings."
+            }),
+        };
+
+        let report = verifier.verify(&output, &note_summarizer_schema()).unwrap();
+        assert!(
+            !report.passed,
+            "verification must fail when summary contains a PII label"
+        );
+        assert!(
+            report.failures.iter().any(|f| f.rule_id == "no-pii-labels"),
+            "failure must be attributed to the no-pii-labels rule; got: {:?}",
+            report.failures
+        );
+    }
+
+    /// A clean summary with no PII labels passes verification.
+    #[test]
+    fn test_clean_summary_passes_verification() {
+        let mut verifier = SchemaVerifier::new();
+        verifier.register_rule(
+            "no-pii-labels",
+            Box::new(|payload| {
+                let summary = payload["summary"].as_str().unwrap_or("");
+                let forbidden = ["DOB:", "SSN:", "MRN:", "Date of Birth:"];
+                for label in &forbidden {
+                    if summary.contains(label) {
+                        return Some(format!(
+                            "summary contains forbidden PII label '{label}'; remove before delivery"
+                        ));
+                    }
+                }
+                None
+            }),
+        );
+
+        let output = AgentOutput {
+            kind: "clinical-summary".to_string(),
+            payload: json!({
+                "patient_id": "patient-042",
+                "note_count": 2,
+                "summary": "Patient presents with mild anemia and type 2 diabetes. No acute findings."
+            }),
+        };
+
+        let report = verifier.verify(&output, &note_summarizer_schema()).unwrap();
+        assert!(
+            report.passed,
+            "clean summary must pass verification; failures: {:?}",
+            report.failures
+        );
+    }
+
+    /// Full scenario runner succeeds end-to-end.
+    #[test]
+    fn test_run_scenario() {
+        run_scenario().expect("note summarizer scenario should succeed");
+    }
 }

@@ -53,7 +53,7 @@ pub enum VerificationRuleType {
         allowed: Vec<Value>,
     },
 
-    /// The field at `field_path` must not match `pattern` (regex or substring).
+    /// The field at `field_path` must not contain `pattern` (substring match).
     ForbiddenPattern {
         /// JSONPath-style dotted path.
         field_path: String,

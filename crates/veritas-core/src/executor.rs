@@ -163,6 +163,10 @@ impl Executor {
             }
 
             // Allow and RequireVerification both proceed to capability check.
+            // Note: RequireVerification is currently functionally equivalent to Allow —
+            // the check_id is not yet acted upon. Verification always runs regardless
+            // of verdict. This variant exists for future use where specific verification
+            // checks can be triggered by policy rules.
             PolicyVerdict::Allow | PolicyVerdict::RequireVerification { .. } => {
                 debug!(
                     execution_id = %execution_id,
@@ -219,7 +223,29 @@ impl Executor {
             step = step_num,
             "capabilities verified, calling agent.propose()"
         );
-        let output = agent.propose(&state, &input)?;
+        let output = match agent.propose(&state, &input) {
+            Ok(o) => o,
+            Err(e) => {
+                // Audit the agent failure so the gap in execution is on record.
+                warn!(
+                    execution_id = %execution_id,
+                    step = step_num,
+                    error = %e,
+                    "agent.propose() failed"
+                );
+                let record = StepRecord {
+                    step: step_num,
+                    input,
+                    verdict: PolicyVerdict::Deny {
+                        reason: format!("agent-error: propose() failed: {e}"),
+                    },
+                    output: None,
+                    timestamp: Utc::now(),
+                };
+                self.audit.write(&record)?;
+                return Err(e);
+            }
+        };
 
         // ── Step 5: Output verification ──────────────────────────────────────
         //
@@ -239,13 +265,46 @@ impl Executor {
                 failures = %failure_summary,
                 "output verification failed"
             );
+            // Audit the verification failure so every rejected output is on record.
+            let record = StepRecord {
+                step: step_num,
+                input,
+                verdict: PolicyVerdict::Deny {
+                    reason: format!("verification-failed: {failure_summary}"),
+                },
+                output: Some(output),
+                timestamp: Utc::now(),
+            };
+            self.audit.write(&record)?;
             return Err(VeritasError::VerificationFailed {
                 reason: failure_summary,
             });
         }
 
         // ── Step 6: State transition ─────────────────────────────────────────
-        let next_state = agent.transition(&state, &output)?;
+        let next_state = match agent.transition(&state, &output) {
+            Ok(s) => s,
+            Err(e) => {
+                // Audit the transition failure so the incomplete step is on record.
+                warn!(
+                    execution_id = %execution_id,
+                    step = step_num,
+                    error = %e,
+                    "agent.transition() failed"
+                );
+                let record = StepRecord {
+                    step: step_num,
+                    input,
+                    verdict: PolicyVerdict::Deny {
+                        reason: format!("agent-error: transition() failed: {e}"),
+                    },
+                    output: Some(output.clone()),
+                    timestamp: Utc::now(),
+                };
+                self.audit.write(&record)?;
+                return Err(e);
+            }
+        };
 
         // ── Step 7: Audit the completed step ─────────────────────────────────
         let record = StepRecord {
@@ -531,6 +590,9 @@ mod tests {
         let agent = MockAgent::new();
         let propose_count = agent.propose_count.clone();
 
+        let audit = MockAudit::new();
+        let audit_records = audit.records.clone();
+
         let executor = Executor::new(
             Box::new(MockPolicy {
                 verdict: PolicyVerdict::RequireApproval {
@@ -538,7 +600,7 @@ mod tests {
                     approver_role: "attending_physician".to_string(),
                 },
             }),
-            Box::new(MockAudit::new()),
+            Box::new(audit),
             Box::new(MockVerifier { pass: true }),
             make_schema(),
         );
@@ -552,6 +614,13 @@ mod tests {
             *propose_count.lock().unwrap(),
             0,
             "propose() must not be called on RequireApproval"
+        );
+
+        // Suspension must be audited so the pending approval is on record.
+        assert_eq!(
+            audit_records.lock().unwrap().len(),
+            1,
+            "RequireApproval must be audited"
         );
 
         match result {
@@ -574,11 +643,14 @@ mod tests {
             required: "phi:read".to_string(),
         };
 
+        let audit = MockAudit::new();
+        let audit_records = audit.records.clone();
+
         let executor = Executor::new(
             Box::new(MockPolicy {
                 verdict: PolicyVerdict::Allow,
             }),
-            Box::new(MockAudit::new()),
+            Box::new(audit),
             Box::new(MockVerifier { pass: true }),
             make_schema(),
         );
@@ -593,6 +665,14 @@ mod tests {
             }
             other => panic!("expected CapabilityMissing, got {other:?}"),
         }
+
+        // The capability failure must be audited as a synthetic denial so there
+        // is no silent gap in the audit trail.
+        assert_eq!(
+            audit_records.lock().unwrap().len(),
+            1,
+            "capability missing must be audited"
+        );
     }
 
     /// A successful step: policy allows, capabilities present, verifier passes.
@@ -705,6 +785,222 @@ mod tests {
                 );
             }
             other => panic!("expected VerificationFailed, got {other:?}"),
+        }
+    }
+
+    /// Verification failures must produce an audit record so the rejected output
+    /// is on record even though state never advanced.
+    #[test]
+    fn test_verification_failure_is_audited() {
+        let agent = MockAgent::new();
+        let audit = MockAudit::new();
+        let audit_records = audit.records.clone();
+
+        let executor = Executor::new(
+            Box::new(MockPolicy {
+                verdict: PolicyVerdict::Allow,
+            }),
+            Box::new(audit),
+            Box::new(MockVerifier { pass: false }),
+            make_schema(),
+        );
+
+        let caps = CapabilitySet::default();
+        let result = executor.step(&agent, make_state("active"), make_input(), &caps);
+
+        assert!(matches!(
+            result,
+            Err(VeritasError::VerificationFailed { .. })
+        ));
+
+        let records = audit_records.lock().unwrap();
+        assert_eq!(records.len(), 1, "verification failure must be audited");
+
+        // The audit record's verdict must identify this as a verification failure.
+        match &records[0].verdict {
+            PolicyVerdict::Deny { reason } => {
+                assert!(
+                    reason.starts_with("verification-failed:"),
+                    "audit reason should be prefixed 'verification-failed:': {reason}"
+                );
+            }
+            other => panic!("expected Deny verdict in audit record, got {other:?}"),
+        }
+    }
+
+    /// An agent whose propose() returns Err must be audited as an agent-error.
+    #[test]
+    fn test_propose_error_is_audited() {
+        /// An agent whose propose() always fails.
+        struct FailingProposeAgent;
+
+        impl Agent for FailingProposeAgent {
+            fn propose(
+                &self,
+                _state: &AgentState,
+                _input: &AgentInput,
+            ) -> VeritasResult<AgentOutput> {
+                Err(VeritasError::StateMachineError {
+                    reason: "propose exploded".to_string(),
+                })
+            }
+
+            fn transition(
+                &self,
+                state: &AgentState,
+                _output: &AgentOutput,
+            ) -> VeritasResult<AgentState> {
+                Ok(AgentState {
+                    step: state.step + 1,
+                    ..state.clone()
+                })
+            }
+
+            fn required_capabilities(
+                &self,
+                _state: &AgentState,
+                _input: &AgentInput,
+            ) -> Vec<String> {
+                vec![]
+            }
+
+            fn describe_action(
+                &self,
+                _state: &AgentState,
+                _input: &AgentInput,
+            ) -> (String, String) {
+                ("respond".to_string(), "user".to_string())
+            }
+
+            fn is_terminal(&self, _state: &AgentState) -> bool {
+                false
+            }
+        }
+
+        let audit = MockAudit::new();
+        let audit_records = audit.records.clone();
+
+        let executor = Executor::new(
+            Box::new(MockPolicy {
+                verdict: PolicyVerdict::Allow,
+            }),
+            Box::new(audit),
+            Box::new(MockVerifier { pass: true }),
+            make_schema(),
+        );
+
+        let caps = CapabilitySet::default();
+        let result = executor.step(
+            &FailingProposeAgent,
+            make_state("active"),
+            make_input(),
+            &caps,
+        );
+
+        assert!(
+            matches!(result, Err(VeritasError::StateMachineError { .. })),
+            "original error must propagate"
+        );
+
+        let records = audit_records.lock().unwrap();
+        assert_eq!(records.len(), 1, "propose() failure must be audited");
+
+        match &records[0].verdict {
+            PolicyVerdict::Deny { reason } => {
+                assert!(
+                    reason.starts_with("agent-error: propose()"),
+                    "audit reason should identify propose failure: {reason}"
+                );
+            }
+            other => panic!("expected Deny verdict in audit record, got {other:?}"),
+        }
+    }
+
+    /// An agent whose transition() returns Err must be audited as an agent-error.
+    #[test]
+    fn test_transition_error_is_audited() {
+        /// An agent whose transition() always fails.
+        struct FailingTransitionAgent;
+
+        impl Agent for FailingTransitionAgent {
+            fn propose(
+                &self,
+                _state: &AgentState,
+                _input: &AgentInput,
+            ) -> VeritasResult<AgentOutput> {
+                Ok(AgentOutput {
+                    kind: "response".to_string(),
+                    payload: serde_json::json!({ "text": "ok" }),
+                })
+            }
+
+            fn transition(
+                &self,
+                _state: &AgentState,
+                _output: &AgentOutput,
+            ) -> VeritasResult<AgentState> {
+                Err(VeritasError::StateMachineError {
+                    reason: "transition exploded".to_string(),
+                })
+            }
+
+            fn required_capabilities(
+                &self,
+                _state: &AgentState,
+                _input: &AgentInput,
+            ) -> Vec<String> {
+                vec![]
+            }
+
+            fn describe_action(
+                &self,
+                _state: &AgentState,
+                _input: &AgentInput,
+            ) -> (String, String) {
+                ("respond".to_string(), "user".to_string())
+            }
+
+            fn is_terminal(&self, _state: &AgentState) -> bool {
+                false
+            }
+        }
+
+        let audit = MockAudit::new();
+        let audit_records = audit.records.clone();
+
+        let executor = Executor::new(
+            Box::new(MockPolicy {
+                verdict: PolicyVerdict::Allow,
+            }),
+            Box::new(audit),
+            Box::new(MockVerifier { pass: true }),
+            make_schema(),
+        );
+
+        let caps = CapabilitySet::default();
+        let result = executor.step(
+            &FailingTransitionAgent,
+            make_state("active"),
+            make_input(),
+            &caps,
+        );
+
+        assert!(
+            matches!(result, Err(VeritasError::StateMachineError { .. })),
+            "original error must propagate"
+        );
+
+        let records = audit_records.lock().unwrap();
+        assert_eq!(records.len(), 1, "transition() failure must be audited");
+
+        match &records[0].verdict {
+            PolicyVerdict::Deny { reason } => {
+                assert!(
+                    reason.starts_with("agent-error: transition()"),
+                    "audit reason should identify transition failure: {reason}"
+                );
+            }
+            other => panic!("expected Deny verdict in audit record, got {other:?}"),
         }
     }
 }

@@ -213,8 +213,8 @@ pub fn run_scenario() -> VeritasResult<()> {
             _ => {}
         }
 
-        let integrity_ok = audit.verify_integrity();
-        let log = audit.export_log();
+        let integrity_ok = audit.verify_integrity().unwrap_or(false);
+        let log = audit.export_log().unwrap();
         println!(
             "  Audit chain integrity:  {} ({} event(s))",
             if integrity_ok { "VERIFIED" } else { "FAILED" },
@@ -277,7 +277,7 @@ pub fn run_scenario() -> VeritasResult<()> {
                 println!("  Policy verdict:         Allow (policy permits the action)");
                 println!("  Capability check:       FAIL — '{capability}' missing for '{action}'");
                 println!("  Agent propose() called: NO (executor blocked before agent logic)");
-                let log = audit.export_log();
+                let log = audit.export_log().unwrap();
                 println!(
                     "  Audit chain integrity:  VERIFIED ({} denial event(s) recorded)",
                     log.events.len()
@@ -358,8 +358,8 @@ pub fn run_scenario() -> VeritasResult<()> {
             _ => {}
         }
 
-        let integrity_ok = audit.verify_integrity();
-        let log = audit.export_log();
+        let integrity_ok = audit.verify_integrity().unwrap_or(false);
+        let log = audit.export_log().unwrap();
         println!(
             "  Audit chain integrity:  {} ({} event(s), denial recorded)",
             if integrity_ok { "VERIFIED" } else { "FAILED" },
@@ -372,4 +372,72 @@ pub fn run_scenario() -> VeritasResult<()> {
     println!();
 
     Ok(())
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use veritas_contracts::policy::{PolicyContext, PolicyVerdict};
+    use veritas_core::traits::PolicyEngine;
+
+    fn make_policy_ctx(action: &str, resource: &str, caps: &[&str]) -> PolicyContext {
+        PolicyContext {
+            agent_id: "test-agent".to_string(),
+            execution_id: "test-exec".to_string(),
+            current_phase: "active".to_string(),
+            action: action.to_string(),
+            resource: resource.to_string(),
+            capabilities: caps.iter().map(|s| s.to_string()).collect(),
+            metadata: serde_json::Value::Null,
+        }
+    }
+
+    /// Policy allows patient record queries when the agent holds patient-records.read
+    /// and the patient has provided consent (resource = patient-records).
+    #[test]
+    fn test_policy_allows_with_consent_and_capability() {
+        let policy = TomlPolicyEngine::from_toml_str(HEALTHCARE_POLICY).unwrap();
+        let ctx = make_policy_ctx("query", "patient-records", &["patient-records.read"]);
+        assert_eq!(policy.evaluate(&ctx).unwrap(), PolicyVerdict::Allow);
+    }
+
+    /// The deny-patient-query-no-consent rule fires when the resource signals
+    /// missing consent, regardless of what capabilities are present.
+    #[test]
+    fn test_policy_denies_no_consent() {
+        let policy = TomlPolicyEngine::from_toml_str(HEALTHCARE_POLICY).unwrap();
+        let ctx = make_policy_ctx(
+            "query",
+            "patient-records-no-consent",
+            &["patient-records.read"],
+        );
+        match policy.evaluate(&ctx).unwrap() {
+            PolicyVerdict::Deny { reason } => {
+                assert!(
+                    reason.contains("consent"),
+                    "deny reason must mention consent: {reason}"
+                );
+            }
+            other => panic!("expected Deny, got {other:?}"),
+        }
+    }
+
+    /// Deny-by-default: the query action is denied when the required capability is absent.
+    #[test]
+    fn test_policy_denies_without_capability() {
+        let policy = TomlPolicyEngine::from_toml_str(HEALTHCARE_POLICY).unwrap();
+        let ctx = make_policy_ctx("query", "patient-records", &[]);
+        match policy.evaluate(&ctx).unwrap() {
+            PolicyVerdict::Deny { .. } => {}
+            other => panic!("expected Deny, got {other:?}"),
+        }
+    }
+
+    /// Full scenario runner covers all three sub-cases without error.
+    #[test]
+    fn test_run_scenario() {
+        run_scenario().expect("patient query scenario should succeed");
+    }
 }

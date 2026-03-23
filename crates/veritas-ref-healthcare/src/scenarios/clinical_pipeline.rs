@@ -492,10 +492,10 @@ pub fn run_scenario() -> VeritasResult<()> {
         }
     };
 
-    let log_1 = audit_1.export_log();
+    let log_1 = audit_1.export_log().unwrap();
     println!(
         "  Audit chain 1:   {} ({} event(s))",
-        if audit_1.verify_integrity() {
+        if audit_1.verify_integrity().unwrap_or(false) {
             "VERIFIED"
         } else {
             "FAILED"
@@ -561,10 +561,10 @@ pub fn run_scenario() -> VeritasResult<()> {
         }
     };
 
-    let log_2 = audit_2.export_log();
+    let log_2 = audit_2.export_log().unwrap();
     println!(
         "  Audit chain 2:   {} ({} event(s))",
-        if audit_2.verify_integrity() {
+        if audit_2.verify_integrity().unwrap_or(false) {
             "VERIFIED"
         } else {
             "FAILED"
@@ -632,10 +632,10 @@ pub fn run_scenario() -> VeritasResult<()> {
         }
     };
 
-    let log_3 = audit_3.export_log();
+    let log_3 = audit_3.export_log().unwrap();
     println!(
         "  Audit chain 3:   {} ({} event(s))",
-        if audit_3.verify_integrity() {
+        if audit_3.verify_integrity().unwrap_or(false) {
             "VERIFIED"
         } else {
             "FAILED"
@@ -730,10 +730,10 @@ pub fn run_scenario() -> VeritasResult<()> {
         }
     }
 
-    let log_4 = audit_4.export_log();
+    let log_4 = audit_4.export_log().unwrap();
     println!(
         "  Audit chain 4:   {} ({} event(s))",
-        if audit_4.verify_integrity() {
+        if audit_4.verify_integrity().unwrap_or(false) {
             "VERIFIED"
         } else {
             "FAILED"
@@ -744,10 +744,10 @@ pub fn run_scenario() -> VeritasResult<()> {
 
     // ── Pipeline summary ──────────────────────────────────────────────────────
 
-    let all_verified = audit_1.verify_integrity()
-        && audit_2.verify_integrity()
-        && audit_3.verify_integrity()
-        && audit_4.verify_integrity();
+    let all_verified = audit_1.verify_integrity().unwrap_or(false)
+        && audit_2.verify_integrity().unwrap_or(false)
+        && audit_3.verify_integrity().unwrap_or(false)
+        && audit_4.verify_integrity().unwrap_or(false);
 
     println!(
         "  Pipeline complete. All 4 audit chains: {}",

@@ -423,10 +423,10 @@ fn run_sub_case_b() -> VeritasResult<()> {
             }
         }
 
-        let log = audit.export_log();
+        let log = audit.export_log().unwrap();
         println!(
             "    Audit chain:     {} ({} event(s))",
-            if audit.verify_integrity() {
+            if audit.verify_integrity().unwrap_or(false) {
                 "VERIFIED"
             } else {
                 "FAILED"

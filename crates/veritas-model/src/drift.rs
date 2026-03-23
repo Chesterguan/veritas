@@ -73,11 +73,19 @@ impl InMemoryDriftMonitor {
     ///
     /// # Panics
     ///
-    /// Panics if `config.window_size` is 0.
+    /// Panics if `config.window_size` is 0, or if
+    /// `config.drift_threshold < config.warning_threshold` (which would make
+    /// the two thresholds semantically inverted).
     pub fn new(config: DriftConfig) -> Self {
         assert!(
             config.window_size > 0,
             "DriftConfig::window_size must be > 0"
+        );
+        assert!(
+            config.drift_threshold >= config.warning_threshold,
+            "DriftConfig::drift_threshold ({}) must be >= warning_threshold ({})",
+            config.drift_threshold,
+            config.warning_threshold,
         );
         Self {
             config,
@@ -89,13 +97,40 @@ impl InMemoryDriftMonitor {
 
 impl DriftMonitor for InMemoryDriftMonitor {
     fn record(&self, model_id: &str, result: &serde_json::Value) -> VeritasResult<()> {
+        use veritas_contracts::error::VeritasError;
+
         // Extract confidence — silently skip results that don't have it.
         let confidence = match result.get("confidence").and_then(|v| v.as_f64()) {
             Some(c) => c,
             None => return Ok(()),
         };
 
-        let mut records = self.records.lock().expect("drift records lock poisoned");
+        // Reject non-finite or out-of-range confidence values.  The caller must
+        // supply a real number in [0.0, 1.0]; anything else indicates a bug in
+        // the model adapter and must not silently corrupt the rolling window.
+        if !confidence.is_finite() {
+            return Err(VeritasError::InvalidInput {
+                reason: format!(
+                    "confidence value for model '{model_id}' must be finite, got {confidence}"
+                ),
+            });
+        }
+        if !(0.0..=1.0).contains(&confidence) {
+            return Err(VeritasError::InvalidInput {
+                reason: format!(
+                    "confidence value for model '{model_id}' must be in [0.0, 1.0], got {confidence}"
+                ),
+            });
+        }
+
+        // Acquire records first, then baselines — this order must be respected
+        // in every method that holds both locks simultaneously to prevent deadlock.
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| VeritasError::InvalidInput {
+                reason: "drift records lock poisoned".to_string(),
+            })?;
         let window = records.entry(model_id.to_string()).or_default();
 
         // Enforce rolling window size.
@@ -109,7 +144,9 @@ impl DriftMonitor for InMemoryDriftMonitor {
             let mut baselines = self
                 .baselines
                 .lock()
-                .expect("drift baselines lock poisoned");
+                .map_err(|_| VeritasError::InvalidInput {
+                    reason: "drift baselines lock poisoned".to_string(),
+                })?;
             if !baselines.contains_key(model_id) {
                 let avg = window.iter().sum::<f64>() / window.len() as f64;
                 baselines.insert(model_id.to_string(), avg);
@@ -120,20 +157,25 @@ impl DriftMonitor for InMemoryDriftMonitor {
     }
 
     fn check_drift(&self, model_id: &str) -> DriftStatus {
-        let baselines = self
-            .baselines
-            .lock()
-            .expect("drift baselines lock poisoned");
+        // Acquire records first, then baselines — same order as `record()` to
+        // prevent a lock-ordering deadlock between the two methods.
+        let records = match self.records.lock() {
+            Ok(r) => r,
+            Err(_) => return DriftStatus::Stable, // poisoned — cannot assess drift
+        };
+        let window = match records.get(model_id) {
+            Some(w) if !w.is_empty() => w,
+            _ => return DriftStatus::Stable,
+        };
+
+        let baselines = match self.baselines.lock() {
+            Ok(b) => b,
+            Err(_) => return DriftStatus::Stable, // poisoned — cannot assess drift
+        };
         let baseline = match baselines.get(model_id) {
             Some(&b) => b,
             // No baseline yet — not enough data to make a judgement.
             None => return DriftStatus::Stable,
-        };
-
-        let records = self.records.lock().expect("drift records lock poisoned");
-        let window = match records.get(model_id) {
-            Some(w) if !w.is_empty() => w,
-            _ => return DriftStatus::Stable,
         };
 
         let current_avg = window.iter().sum::<f64>() / window.len() as f64;
@@ -290,5 +332,77 @@ mod tests {
     fn unknown_model_returns_stable() {
         let m = monitor();
         assert_eq!(m.check_drift("never-seen"), DriftStatus::Stable);
+    }
+
+    // ── 8: inverted thresholds panic at construction ──────────────────────────
+
+    #[test]
+    #[should_panic(expected = "drift_threshold")]
+    fn inverted_thresholds_panic() {
+        // drift_threshold < warning_threshold is semantically invalid.
+        let cfg = DriftConfig {
+            warning_threshold: 0.3,
+            drift_threshold: 0.1, // inverted — must panic
+            window_size: 5,
+        };
+        InMemoryDriftMonitor::new(cfg);
+    }
+
+    // ── 9: confidence validation in record() ──────────────────────────────────
+
+    // NaN and Infinity cannot be represented in JSON — serde_json encodes them
+    // as `null`, so `as_f64()` returns None and record() silently skips the
+    // entry (same as any other missing confidence field).  The `is_finite()`
+    // guard in record() protects future non-JSON callers; it is not reachable
+    // through the JSON extraction path.
+    #[test]
+    fn nan_confidence_via_json_is_silently_ignored() {
+        let m = monitor();
+        // serde_json serialises NaN as null — treated as "no confidence field".
+        m.record("model-f", &serde_json::json!({ "confidence": f64::NAN }))
+            .unwrap();
+        assert_eq!(m.check_drift("model-f"), DriftStatus::Stable);
+    }
+
+    #[test]
+    fn infinite_confidence_via_json_is_silently_ignored() {
+        let m = monitor();
+        // serde_json serialises Infinity as null — treated as "no confidence field".
+        m.record(
+            "model-f",
+            &serde_json::json!({ "confidence": f64::INFINITY }),
+        )
+        .unwrap();
+        assert_eq!(m.check_drift("model-f"), DriftStatus::Stable);
+    }
+
+    #[test]
+    fn record_rejects_confidence_above_one() {
+        let m = monitor();
+        let err = m
+            .record("model-f", &serde_json::json!({ "confidence": 1.5 }))
+            .unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("[0.0, 1.0]"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn record_rejects_negative_confidence() {
+        let m = monitor();
+        let err = m
+            .record("model-f", &serde_json::json!({ "confidence": -0.1 }))
+            .unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("[0.0, 1.0]"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn record_accepts_boundary_confidence_values() {
+        let m = monitor();
+        // 0.0 and 1.0 are both valid boundary values.
+        m.record("model-g", &serde_json::json!({ "confidence": 0.0 }))
+            .unwrap();
+        m.record("model-g", &serde_json::json!({ "confidence": 1.0 }))
+            .unwrap();
     }
 }

@@ -2,7 +2,7 @@
 name = "veritas-ref-healthcare"
 version = "0.1.0"
 edition = "2021"
-description = "Healthcare reference runtime demonstrating VERITAS in three clinical AI scenarios"
+description = "Healthcare reference runtime demonstrating VERITAS in seven clinical AI scenarios"
 
 [dependencies]
 veritas-contracts.workspace = true

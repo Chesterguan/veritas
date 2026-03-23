@@ -26,7 +26,7 @@ impl Capability {
 ///
 /// This is constructed at startup by the hosting application and passed
 /// to the executor. The executor checks it before calling `agent.propose()`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CapabilitySet {
     inner: HashSet<Capability>,
 }

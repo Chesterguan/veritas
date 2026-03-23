@@ -8,7 +8,7 @@ Thank you for your interest in contributing to VERITAS. This guide will help you
 
 ### Prerequisites
 
-- Rust 1.78+ (`rustup` recommended)
+- Rust 1.85+ (`rustup` recommended)
 - Git
 
 ### Getting Started
@@ -20,7 +20,7 @@ cargo test --workspace
 cargo run -p demo -- run-all
 ```
 
-If all 58 tests pass and the demo runs, you're ready to contribute.
+If all 131 tests pass and the demo runs, you're ready to contribute.
 
 ## Project Structure
 
@@ -31,10 +31,11 @@ crates/
   veritas-policy/          # TOML-driven deny-by-default policy engine
   veritas-audit/           # SHA-256 hash-chained append-only audit trail
   veritas-verify/          # JSON Schema + semantic rule verification
-  veritas-ref-healthcare/  # Healthcare reference runtime (5 demo scenarios)
+  veritas-model/           # Model registry, drift detection, model governance
+  veritas-ref-healthcare/  # Healthcare reference runtime (7 demo scenarios)
 demo/                      # CLI demo runner
 tui/                       # Interactive TUI demo
-docs/                      # Whitepaper v0.3 + Yellow Paper v0.1 (EN, ZH, JA, FR)
+docs/                      # Whitepaper v0.3 + Yellow Paper v0.2 (EN, ZH, JA, FR)
 ```
 
 ## How to Contribute

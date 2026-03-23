@@ -231,8 +231,8 @@ pub fn run_scenario() -> VeritasResult<()> {
 
     // ── Verify audit chain integrity ──────────────────────────────────────────
 
-    let integrity_ok = audit.verify_integrity();
-    let log = audit.export_log();
+    let integrity_ok = audit.verify_integrity().unwrap_or(false);
+    let log = audit.export_log().unwrap();
 
     println!(
         "  Audit chain integrity:  {} ({} event(s) in chain)",
@@ -244,4 +244,75 @@ pub fn run_scenario() -> VeritasResult<()> {
     println!();
 
     Ok(())
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use veritas_contracts::policy::{PolicyContext, PolicyVerdict};
+    use veritas_core::traits::{PolicyEngine, Verifier};
+
+    fn make_policy_ctx(action: &str, resource: &str, caps: &[&str]) -> PolicyContext {
+        PolicyContext {
+            agent_id: "test-agent".to_string(),
+            execution_id: "test-exec".to_string(),
+            current_phase: "active".to_string(),
+            action: action.to_string(),
+            resource: resource.to_string(),
+            capabilities: caps.iter().map(|s| s.to_string()).collect(),
+            metadata: serde_json::Value::Null,
+        }
+    }
+
+    /// Policy allows the drug interaction check when the agent holds drug-database.read.
+    #[test]
+    fn test_policy_allows_drug_interaction_check() {
+        let policy = TomlPolicyEngine::from_toml_str(HEALTHCARE_POLICY).unwrap();
+        let ctx = make_policy_ctx(
+            "drug-interaction-check",
+            "drug-database",
+            &["drug-database.read"],
+        );
+        assert_eq!(policy.evaluate(&ctx).unwrap(), PolicyVerdict::Allow);
+    }
+
+    /// Deny-by-default: the action is denied when the required capability is absent.
+    #[test]
+    fn test_policy_denies_without_capability() {
+        let policy = TomlPolicyEngine::from_toml_str(HEALTHCARE_POLICY).unwrap();
+        let ctx = make_policy_ctx("drug-interaction-check", "drug-database", &[]);
+        match policy.evaluate(&ctx).unwrap() {
+            PolicyVerdict::Deny { .. } => {}
+            other => panic!("expected Deny, got {other:?}"),
+        }
+    }
+
+    /// The drug interaction output schema accepts the agent's actual output payload.
+    #[test]
+    fn test_schema_verification_passes() {
+        let verifier = SchemaVerifier::new();
+        let schema = drug_interaction_schema();
+
+        // Replicate exactly what DrugInteractionAgent produces via check_drug_interaction.
+        let payload = crate::mock_data::check_drug_interaction("warfarin", "aspirin");
+        let output = veritas_contracts::agent::AgentOutput {
+            kind: "drug-interaction-result".to_string(),
+            payload,
+        };
+
+        let report = verifier.verify(&output, &schema).unwrap();
+        assert!(
+            report.passed,
+            "schema verification must pass for valid payload; failures: {:?}",
+            report.failures
+        );
+    }
+
+    /// Full scenario runner succeeds end-to-end (sub-case A: warfarin + aspirin).
+    #[test]
+    fn test_sub_case_a_runs() {
+        run_scenario().expect("drug interaction scenario should succeed");
+    }
 }

@@ -326,10 +326,10 @@ fn run_step1_and_simulate_approval() -> VeritasResult<(String, String)> {
             println!("  Policy verdict: RequireApproval");
             println!("  Reason:         {reason}");
             println!("  Approver role:  {approver_role}");
-            let log = audit.export_log();
+            let log = audit.export_log().unwrap();
             println!(
                 "  Audit chain:    {} ({} event(s))",
-                if audit.verify_integrity() {
+                if audit.verify_integrity().unwrap_or(false) {
                     "VERIFIED"
                 } else {
                     "FAILED"
@@ -429,10 +429,10 @@ pub fn run_scenario() -> VeritasResult<()> {
                 println!("  Capability:     PASS");
                 println!("  Verification:   PASS");
                 println!("  Coverage:       COVERED ({plan}, copay ${copay})");
-                let log = audit.export_log();
+                let log = audit.export_log().unwrap();
                 println!(
                     "  Audit chain:    {} ({} event(s))",
-                    if audit.verify_integrity() {
+                    if audit.verify_integrity().unwrap_or(false) {
                         "VERIFIED"
                     } else {
                         "FAILED"
@@ -498,10 +498,10 @@ pub fn run_scenario() -> VeritasResult<()> {
                 println!("  Verification:   PASS");
                 println!("  PA Reference:   {pa_ref}");
                 println!("  Status:         {status}");
-                let log_3 = audit_3.export_log();
+                let log_3 = audit_3.export_log().unwrap();
                 println!(
                     "  Audit chain:    {} ({} event(s))",
-                    if audit_3.verify_integrity() {
+                    if audit_3.verify_integrity().unwrap_or(false) {
                         "VERIFIED"
                     } else {
                         "FAILED"
@@ -572,10 +572,10 @@ pub fn run_scenario() -> VeritasResult<()> {
                 println!("  Policy verdict: Deny");
                 println!("  Reason:         {reason}");
                 println!("  Agent propose(): NOT called (blocked before capability check)");
-                let log = audit.export_log();
+                let log = audit.export_log().unwrap();
                 println!(
                     "  Audit chain:    {} ({} denial event(s))",
-                    if audit.verify_integrity() {
+                    if audit.verify_integrity().unwrap_or(false) {
                         "VERIFIED"
                     } else {
                         "FAILED"

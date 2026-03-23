@@ -9,5 +9,5 @@ veritas-contracts.workspace = true
 veritas-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-toml = "0.8"
+toml.workspace = true
 tracing.workspace = true

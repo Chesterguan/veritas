@@ -79,28 +79,44 @@ impl InMemoryAuditWriter {
     ///
     /// The `terminal_hash` is the `this_hash` of the last event, or an empty
     /// string when no events have been written.
-    pub fn export_log(&self) -> AuditLog {
-        let state = self.state.lock().expect("audit state lock poisoned");
+    ///
+    /// Returns `Err(AuditWriteFailed)` if the internal mutex is poisoned,
+    /// which cannot happen under normal operation.
+    pub fn export_log(&self) -> VeritasResult<AuditLog> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|e| VeritasError::AuditWriteFailed {
+                reason: format!("audit state lock poisoned: {e}"),
+            })?;
         let terminal_hash = state
             .events
             .last()
             .map(|e| e.this_hash.clone())
             .unwrap_or_default();
 
-        AuditLog {
+        Ok(AuditLog {
             execution_id: self.execution_id.clone(),
             events: state.events.clone(),
             finalized_at: Utc::now(),
             terminal_hash,
-        }
+        })
     }
 
     /// Verify that the in-memory chain has not been tampered with.
     ///
     /// Delegates to `verify_chain`, which checks both prev-hash linkage and
     /// hash correctness for every event.
-    pub fn verify_integrity(&self) -> bool {
-        let state = self.state.lock().expect("audit state lock poisoned");
+    ///
+    /// Returns `Err(AuditWriteFailed)` if the internal mutex is poisoned,
+    /// which cannot happen under normal operation.
+    pub fn verify_integrity(&self) -> VeritasResult<bool> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|e| VeritasError::AuditWriteFailed {
+                reason: format!("audit state lock poisoned: {e}"),
+            })?;
         verify_chain(&state.events)
     }
 }
@@ -127,7 +143,7 @@ impl AuditWriter for InMemoryAuditWriter {
         let prev_hash = state.last_hash.clone();
         let sequence = state.sequence;
 
-        let this_hash = hash_event(&self.execution_id, sequence, record, &prev_hash);
+        let this_hash = hash_event(&self.execution_id, sequence, record, &prev_hash)?;
 
         let event = AuditEvent {
             sequence,
@@ -150,6 +166,17 @@ impl AuditWriter for InMemoryAuditWriter {
     /// to disk or a database would flush/seal here; the in-memory writer has
     /// nothing to flush.
     fn finalize(&self, execution_id: &str) -> VeritasResult<()> {
+        // Reject finalization for a different execution_id — this guards
+        // against accidentally sealing the wrong audit trail.
+        if execution_id != self.execution_id {
+            return Err(VeritasError::AuditWriteFailed {
+                reason: format!(
+                    "finalize called with execution_id '{}' but writer owns '{}'",
+                    execution_id, self.execution_id
+                ),
+            });
+        }
+
         let state = self
             .state
             .lock()

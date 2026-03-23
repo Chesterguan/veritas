@@ -48,6 +48,39 @@ impl TomlPolicyEngine {
         let config: PolicyConfig = toml::from_str(s).map_err(|e| VeritasError::ConfigError {
             reason: format!("failed to parse policy TOML: {e}"),
         })?;
+
+        // Validate rule invariants at load time so misconfigured policies fail
+        // fast rather than silently falling back to defaults at evaluation time.
+        for rule in &config.rules {
+            match rule.verdict {
+                RuleVerdict::Deny if rule.deny_reason.is_none() => {
+                    return Err(VeritasError::ConfigError {
+                        reason: format!(
+                            "rule '{}': verdict='deny' requires 'deny_reason' to be set",
+                            rule.id
+                        ),
+                    });
+                }
+                RuleVerdict::RequireApproval if rule.approver_role.is_none() => {
+                    return Err(VeritasError::ConfigError {
+                        reason: format!(
+                            "rule '{}': verdict='require-approval' requires 'approver_role' to be set",
+                            rule.id
+                        ),
+                    });
+                }
+                RuleVerdict::RequireVerification if rule.verification_check_id.is_none() => {
+                    return Err(VeritasError::ConfigError {
+                        reason: format!(
+                            "rule '{}': verdict='require-verification' requires 'verification_check_id' to be set",
+                            rule.id
+                        ),
+                    });
+                }
+                _ => {}
+            }
+        }
+
         Ok(Self { config })
     }
 

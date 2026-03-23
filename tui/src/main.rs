@@ -302,8 +302,8 @@ fn run_drug_interaction() -> ExecutionCapture {
         }
     };
 
-    let log = audit.export_log();
-    let chain_integrity = audit.verify_integrity();
+    let log = audit.export_log().expect("audit log export failed");
+    let chain_integrity = audit.verify_integrity().unwrap_or(false);
 
     let extra_lines = if let Some(ref out) = output {
         let severity = out.payload["result"]["severity"]
@@ -624,8 +624,8 @@ fn pipeline_step<A: Agent>(
     );
 
     let result = executor.step(agent, state, input, &capability_set);
-    let log = audit.export_log();
-    let integrity = audit.verify_integrity();
+    let log = audit.export_log().expect("audit log export failed");
+    let integrity = audit.verify_integrity().unwrap_or(false);
 
     match result {
         Ok(StepResult::Complete { output, .. }) | Ok(StepResult::Transitioned { output, .. }) => (

@@ -1,6 +1,6 @@
 # VERITAS Documentation
 
-> Last updated: 2026-02-27
+> Last updated: 2026-03-23
 
 ## Whitepaper v0.3
 
@@ -13,7 +13,7 @@ The whitepaper describes VERITAS vision, design philosophy, system architecture,
 | 日本語 | [WHITEPAPER.ja.md](whitepaper/WHITEPAPER.ja.md) |
 | Français | [WHITEPAPER.fr.md](whitepaper/WHITEPAPER.fr.md) |
 
-## Yellow Paper v0.1
+## Yellow Paper v0.2
 
 Technical specification and formal definitions for the VERITAS runtime — execution semantics, policy language, audit schema, and verification protocol.
 

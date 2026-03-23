@@ -215,7 +215,7 @@ For multi-institution deployments:
 ### Phase 4: Healthcare Reference Scenarios (veritas-ref-healthcare)
 - [x] Scenario: Radiology AI (ImageToLabel) with approval gate
 - [x] Scenario: Sepsis risk model (TabularToScore) with drift detection
-- [x] Scenario: Multi-model pipeline (LLM + vision) with model registry
+- [ ] Scenario: Multi-model pipeline (LLM + vision) with model registry
 
 ### Phase 5: ClinicClaw Integration
 - [ ] Migrate `LlmCapability` to implement `ModelCapability`

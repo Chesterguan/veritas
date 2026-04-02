@@ -140,7 +140,7 @@ VERITAS におけるエージェント実行は、制御されたケイパビリ
 ### 実行ループ
 
 ```
-State → Policy → Capability → Audit → Verify → Next State
+State → Policy → Capability → Propose → Verify → Transition → Audit
 ```
 
 各遷移は明示的・ポリシーチェック済み・監査済み・検証済みであり、エージェントが次の状態に進む前に完了する。ループは意図的に最小限に設計されており——隠れたミドルウェアなし・重厚なオーケストレーションなし・レイテンシを増加させる抽象化レイヤーなし。

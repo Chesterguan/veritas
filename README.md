@@ -61,10 +61,10 @@ Red Hat Enterprise  →  VERITAS                (trusted, governed, auditable)
 
 ### Execution Model
 
-Every agent action follows the same deterministic pipeline — no exceptions, no shortcuts:
+Every agent action follows the same policy-enforced pipeline — no exceptions, no shortcuts. The pipeline structure is deterministic: same input + same policy = same sequence of trust checks. Agent behavior inside `propose()` is untrusted and may produce non-deterministic outputs, which are subject to policy, capability, and verification checks.
 
 ```
-State → Policy → Capability → Audit → Verify → Next State
+State → Policy → Capability → Propose → Verify → Transition → Audit
 ```
 
 ### Trust Boundary
@@ -122,10 +122,12 @@ cargo run -p demo -- sepsis-model
 6. Minimal trusted computing base
 7. Auditability by design
 8. Verifiable execution
-9. Human override always possible
+9. Human override always possible — the `RequireApproval` policy verdict suspends execution for human review; the hosting application handles the approval workflow
 10. Data-model independence
 
 > **Lightweight by conviction.** Governance must not be the reason agents become slow, heavy, or hard to build.
+
+No performance benchmarks are provided in v0. The lightweight claim is based on architectural decisions (synchronous execution, no heavy dependencies, O(n) policy evaluation) rather than measured performance data.
 
 ## Project Structure
 
@@ -161,6 +163,15 @@ docs/
 | 简体中文 | [WHITEPAPER.zh.md](docs/whitepaper/WHITEPAPER.zh.md) |
 | 日本語 | [WHITEPAPER.ja.md](docs/whitepaper/WHITEPAPER.ja.md) |
 | Français | [WHITEPAPER.fr.md](docs/whitepaper/WHITEPAPER.fr.md) |
+
+## Limitations
+
+- **Policy rules are pattern-based.** Rules match on (action, resource) pairs — no field-level conditions, time-based rules, or rule composition. Complex decisions must be modeled through action/resource routing.
+- **Audit trail is in-memory.** The reference `InMemoryAuditWriter` does not persist. Production deployments need a persistent backend.
+- **Verification failure is terminal.** No recovery or escalation path within the runtime.
+- **Determinism scope.** Pipeline and policy are deterministic. Agent `propose()` is untrusted and may be non-deterministic.
+- **No performance benchmarks.** Lightweight design is claimed but not measured in v0.
+- **Model drift baseline is fixed.** Cannot adapt to intentional model improvements without re-registration.
 
 ## Contributing
 

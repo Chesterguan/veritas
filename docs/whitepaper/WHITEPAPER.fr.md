@@ -140,7 +140,7 @@ L'exécution d'agents dans VERITAS est modélisée comme une machine à états d
 ### Boucle d'exécution
 
 ```
-State → Policy → Capability → Audit → Verify → Next State
+State → Policy → Capability → Propose → Verify → Transition → Audit
 ```
 
 Chaque transition est explicite, vérifiée par politique, auditée et validée avant que l'agent passe à l'état suivant. La boucle est intentionnellement minimale — pas d'intergiciel caché, pas d'orchestration lourde, pas de couches d'abstraction ajoutant de la latence.

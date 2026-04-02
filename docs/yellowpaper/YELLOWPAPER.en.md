@@ -281,7 +281,7 @@ trait PolicyEngine: Send + Sync {
 }
 ```
 
-Must be deterministic. Must be fast (microseconds). Called before any agent logic.
+Must be deterministic and efficient. The reference implementation (`TomlPolicyEngine`) performs O(n) linear scan over rules with no I/O. Called before any agent logic.
 
 ### 2.3 AuditWriter (trusted)
 
@@ -347,16 +347,16 @@ Wraps a concrete model backend behind an object-safe interface. Uses `serde_json
 The `Executor` drives a single agent execution. One executor per `ExecutionId`. Defined in `veritas-core/src/executor.rs`.
 
 ```rust
+// Current implementation
 struct Executor {
     policy:   Box<dyn PolicyEngine>,
     audit:    Box<dyn AuditWriter>,
     verifier: Box<dyn Verifier>,
-    registry: Option<Arc<ModelRegistry>>,  // model governance
     schema:   OutputSchema,
 }
 ```
 
-> **Note:** The `registry` field integration into the Executor is the target architecture defined by the [ModelCapability RFC](../rfc-model-capability.md). The current implementation provides `ModelRegistry` as a standalone trusted component; full Executor integration is planned.
+> **Target architecture:** A `registry: Option<Arc<ModelRegistry>>` field is planned for the Executor as defined by the [ModelCapability RFC](../rfc-model-capability.md). The current implementation provides `ModelRegistry` as a standalone trusted component outside the Executor; full integration is planned.
 
 ### 3.1 The `step()` Algorithm
 
@@ -444,7 +444,7 @@ resource = "the-resource"                      # or "*" for wildcard
 required_capabilities = ["cap.name"]           # optional, default []
 verdict = "allow"                              # allow | deny | require-approval | require-verification
 deny_reason = "..."                            # required when verdict = deny
-approval_reason = "..."                        # required when verdict = require-approval
+approval_reason = "..."                        # optional; defaults to "approval required by rule '{id}'"
 approver_role = "..."                          # required when verdict = require-approval
 verification_check_id = "..."                  # required when verdict = require-verification
 ```
@@ -640,6 +640,8 @@ this_hash = SHA-256(
 ```
 
 The result is a lowercase 64-character hex string.
+
+**Known limitation:** Hash construction depends on `serde_json::to_vec()` for the canonical JSON representation of `StepRecord`. If the field order of `StepRecord` changes between VERITAS versions (due to struct field reordering or serde updates), audit chains created by one version may fail verification under another. A future hardening pass should adopt an explicit canonical serialization format (sorted-key JSON or CBOR with a fixed schema) to eliminate this dependency.
 
 **Chain formula:**
 
@@ -948,7 +950,7 @@ The trusted computing base is five components. Everything else is untrusted by d
 
 ### 9.3 Suspended State
 
-- `StepResult::AwaitingApproval` — execution paused. The caller must persist `suspended_state`, obtain approval from the specified `approver_role`, and resume by calling `step()` with an `AgentInput { kind: "approval_granted", ... }` carrying the approval token.
+- `StepResult::AwaitingApproval` — execution paused. The caller (hosting application) must persist `suspended_state`, obtain approval from the specified `approver_role` through its own approval workflow (e.g., notification system, approval UI, or integration with clinical decision support), and resume by calling `step()` with an `AgentInput { kind: "approval_granted", ... }` carrying the approval token. VERITAS does not implement the approval workflow itself — it provides the suspension point and the resume protocol. The approval mechanism (UI, notifications, approval ledger, token validation) is the responsibility of the hosting application.
 
 ### 9.4 Continuing State
 
@@ -1117,7 +1119,7 @@ veritas-contracts          (no dependencies — shared types only)
     └── (all crates depend on veritas-contracts)
 ```
 
-**Workspace:** 9 members. **Tests:** 109 across all crates.
+**Workspace:** 9 members. **Tests:** 131 across all crates.
 
 ---
 

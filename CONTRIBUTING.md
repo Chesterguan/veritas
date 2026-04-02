@@ -27,7 +27,7 @@ If all 131 tests pass and the demo runs, you're ready to contribute.
 ```
 crates/
   veritas-contracts/       # Shared types, traits, error types
-  veritas-core/            # Executor — enforces State → Policy → Capability → Audit → Verify → Next State
+  veritas-core/            # Executor — enforces State → Policy → Capability → Propose → Verify → Transition → Audit
   veritas-policy/          # TOML-driven deny-by-default policy engine
   veritas-audit/           # SHA-256 hash-chained append-only audit trail
   veritas-verify/          # JSON Schema + semantic rule verification

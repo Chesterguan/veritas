@@ -71,7 +71,7 @@ docs/                      # Whitepaper v0.3 (EN, ZH, JA, FR), Yellow Paper v0.2
 ## Execution Model
 
 ```
-State → Policy → Capability → Audit → Verify → Next State
+State → Policy → Capability → Propose → Verify → Transition → Audit
 ```
 
 ## Key Crate Versions

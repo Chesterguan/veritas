@@ -4,7 +4,7 @@
 
 *Lightweight · Deterministic · Auditable · Verifiable*
 
-> Last updated: 2026-02-18
+> Last updated: 2026-04-02
 
 ---
 
@@ -26,6 +26,7 @@
 14. [Reference Domain: Healthcare](#14-reference-domain-healthcare)
 15. [Landscape and Differentiation](#15-landscape-and-differentiation)
 16. [Extensibility](#16-extensibility)
+17. [Limitations](#17-limitations)
 
 ---
 
@@ -86,7 +87,7 @@ The ten principles that govern all VERITAS design decisions:
 6. **Minimal trusted computing base** — small surface, fewer bugs, easier to audit
 7. **Auditability by design** — not bolted on, built in from day one
 8. **Verifiable execution** — every output can be independently validated
-9. **Human override always possible** — machines propose, humans dispose
+9. **Human override always possible** — machines propose, humans dispose. The runtime supports this through the `RequireApproval` policy verdict, which suspends execution and returns control to the hosting application for human review. The approval mechanism itself (UI, notification, approval ledger) is the responsibility of the hosting application, not the runtime.
 10. **Data-model independence** — no coupling to FHIR, OMOP, or any domain schema
 
 And one meta-principle above all:
@@ -125,7 +126,7 @@ From OpenClaw:
 What neither ZeroClaw nor OpenClaw were designed to provide — and what regulated environments demand:
 
 - **Deny-by-default policy engine** — every action policy-checked before execution
-- **Immutable audit trail** — append-only event stream, tamper-evident, replayable
+- **Immutable audit trail** — append-only event stream, tamper-evident, hash-chained
 - **Output verification** — schema, rule, and risk validation before delivery
 - **Formal trust boundary** — LLM, tools, and data treated as untrusted by architecture
 - **Capability-level security** — permissions and side-effect declarations per tool
@@ -140,17 +141,17 @@ Agent execution in VERITAS is modeled as a deterministic state machine operating
 ### Execution Loop
 
 ```
-State → Policy → Capability → Audit → Verify → Next State
+State → Policy → Capability → Propose → Verify → Transition → Audit
 ```
 
-Each transition is explicit, policy-checked, audited, and verified before the agent advances to the next state. The loop is intentionally minimal — no hidden middleware, no heavy orchestration, no latency-adding abstraction layers.
+Each step is explicit, policy-checked, and audited regardless of outcome. Successful outputs are verified before the agent advances to the next state. The loop is intentionally minimal — no hidden middleware, no heavy orchestration, no latency-adding abstraction layers.
 
 ### State Machine Properties
 
-- **Deterministic** — same input + same policy = same execution path
+- **Deterministic** — the pipeline structure and policy evaluation are deterministic: same input + same policy = same execution path. Agent behavior inside `propose()` is untrusted and may be non-deterministic (e.g., LLM-backed agents). VERITAS does not verify or enforce determinism of agent outputs.
 - **Observable** — every state transition is an audit event
 - **Interruptible** — human override can halt or redirect at any transition
-- **Replayable** — execution traces can reproduce any past run
+- **Auditable** — execution traces provide the evidence to audit past runs. There is no replay mechanism in v0; the audit trail establishes what happened, not a means to re-execute it.
 
 ## 7. Trust Model
 
@@ -168,6 +169,17 @@ The system does not inherently trust LLM reasoning, external tools, input data, 
 | Verifier | External environment |
 
 Trust is not assumed. Trust is derived from evidence — audit trails, policy logs, and verification results.
+
+### How Trust Is Enforced
+
+Trust boundaries are enforced by code structure, not by configuration:
+
+- **Policy before proposal** — the policy engine runs before `agent.propose()`. Without an Allow verdict and the required capabilities, the proposal path is structurally unreachable.
+- **Append-only audit trail** — the audit writer is append-only with SHA-256 hash chaining. Tampering with any record breaks chain integrity and is detectable during verification.
+- **Verifier between proposal and transition** — the verifier runs after `propose()` but before `transition()`. Outputs that fail verification never reach the agent's next state.
+- **Capabilities are immutable at runtime** — capabilities are granted at startup and never elevated during execution (INV-10). There is no runtime escalation path.
+
+The boundary is structural. An agent that lacks the required capability cannot reach the code path that calls the tool — there is no permission check to bypass.
 
 ## 8. Capability Model
 
@@ -192,9 +204,25 @@ VERITAS enforces deny-by-default execution. Policy decisions evaluate subject, a
 
 Policy is deterministic, explainable, and auditable. Every policy decision can be traced back to a specific rule, and every rule can be inspected by a human auditor.
 
+### Policy Rule Format
+
+Rules are declared in TOML and evaluated in declaration order (first-match-wins). If no rule matches, the default verdict is Deny. Rules match on (action, resource) pairs with exact or wildcard matching.
+
+Example rule:
+
+```toml
+[[rules]]
+id = "allow-drug-interaction-check"
+description = "Agent may query the drug interaction database"
+action = "drug-interaction-check"
+resource = "drug-database"
+required_capabilities = ["drug-database.read"]
+verdict = "allow"
+```
+
 ### Lightweight by Design
 
-The policy engine is not a heavyweight business-rules platform. It is a fast, deterministic evaluator — closer to a firewall than to an enterprise workflow engine. Policy evaluation should add microseconds, not milliseconds.
+The policy engine is not a heavyweight business-rules platform. It is a fast, deterministic evaluator — closer to a firewall than to an enterprise workflow engine. Policy evaluation is designed to be fast — O(n) linear scan over rules, with no I/O in the evaluation path. No performance benchmarks are provided in v0.
 
 ## 10. Audit and Traceability
 
@@ -206,13 +234,44 @@ All execution events are recorded in an append-only event stream forming a verif
 - Verification results
 - Timestamps and causal ordering
 
-The system supports replayable and tamper-evident execution traces. Any execution can be independently reproduced and verified after the fact.
+The chain is tamper-evident: each record includes a SHA-256 hash over the record and its predecessor, making any modification detectable.
+
+### Hash Chain Construction
+
+Each audit record's hash is computed as:
+
+```
+SHA-256( execution_id || sequence (8-byte little-endian) || prev_hash || canonical JSON of record )
+```
+
+The genesis hash (first event in an execution) uses 64 hex zeros as `prev_hash`. Chain verification recomputes each hash and checks that each record's `prev_hash` matches the hash of the preceding record.
+
+**Reference implementation.** The v0 implementation uses an in-memory store (`InMemoryAuditWriter`). It does not persist across process restarts. Persistent backends — database, filesystem, blockchain — can be plugged in via the `AuditWriter` trait but are not included in v0.
+
+**Known limitation.** Hash construction depends on `serde_json::to_vec()` field ordering, which may vary across VERITAS versions. Chains created by different versions may not be cross-version verifiable. A future hardening pass should adopt explicit canonical serialization (e.g., RFC 8785 JCS).
 
 ### Why This Matters
 
 In regulated environments, "it worked" is not enough. You must prove *how* it worked, *why* each decision was made, and *what* was checked. The audit trail is not a log file — it is the evidence that the system behaved correctly.
 
-## 11. Security Model
+## 11. Verification Model
+
+Every agent output passes through a two-phase verifier before it can trigger a state transition.
+
+**Phase 1 — Structural validation.** The output is validated against a JSON Schema. Structural errors (missing required fields, wrong types, disallowed properties) are caught here.
+
+**Phase 2 — Semantic rule evaluation.** The structurally valid output is evaluated against a set of semantic rules. Rule types include:
+
+- **RequiredField** — a specified field must be present and non-empty
+- **AllowedValues** — a field value must belong to a declared set
+- **ForbiddenPattern** — a field value must not match a given pattern
+- **Custom** — domain-specific validation logic (e.g., PII detection in clinical notes, formulary membership checks)
+
+All failures across both phases are accumulated before returning. The caller receives the full set of violations, not just the first one.
+
+Verification failure is a hard stop — the output is rejected and never reaches the agent's state transition. There is no partial acceptance or conditional pass-through. The hosting application is responsible for retry logic, escalation, or human review.
+
+## 12. Security Model
 
 VERITAS enforces least privilege, isolated capability execution, and strict boundary control.
 
@@ -224,7 +283,7 @@ The runtime does not allow direct system access and assumes all external compone
 - Output verification → no unvalidated deliverables
 - Trust boundary → no implicit trust in LLM or tools
 
-## 12. Data Model Independence
+## 13. Data Model Independence
 
 The VERITAS core runtime is independent of specific healthcare or enterprise data models such as FHIR, OMOP, HL7, or proprietary schemas.
 
@@ -256,7 +315,7 @@ If VERITAS can earn trust in healthcare, it can earn trust anywhere.
 | Clinical decision support | Output verification — every recommendation validated before delivery |
 | Interoperability (FHIR, HL7, OMOP) | Domain adapters as capabilities — core stays clean |
 | Human oversight requirements | Require Approval policy — clinician review for sensitive operations |
-| Reproducibility for audits | Replayable execution traces — recreate any past agent run |
+| Reproducibility for audits | Tamper-evident audit trail — provides the evidence to review and audit any past agent run |
 
 ### What VERITAS Does NOT Do in Healthcare
 
@@ -309,6 +368,24 @@ VERITAS provides standardized interfaces for:
 - Verification modules (custom validators per domain)
 
 External contributors may extend the system without modifying the trusted core. The extension model follows the same principle as ZeroClaw's trait-based architecture: composable, swappable, and minimal.
+
+## 17. Limitations
+
+The following limitations are documented to help adopters make informed decisions about fitness for purpose.
+
+- **Policy engine scope.** Rules match on (action, resource) pairs. There is no field-level conditional logic, no time-based rules, and no rule composition (AND/OR). Complex policy decisions must be modeled through action/resource routing in the agent.
+
+- **In-memory audit trail.** The reference `InMemoryAuditWriter` does not persist across process restarts. Production deployments must implement a persistent `AuditWriter` backend.
+
+- **Verification failure is terminal.** Failed verification halts execution with no recovery, escalation, or remediation path within the runtime. The hosting application must handle retry or human escalation.
+
+- **Determinism scope.** The pipeline structure and policy evaluation are deterministic. Agent behavior inside `propose()` is untrusted and may be non-deterministic (e.g., LLM inference). VERITAS does not verify or enforce determinism of agent outputs.
+
+- **Hash chain versioning.** Audit chain integrity depends on `serde_json` field ordering. Chains created by different VERITAS versions may not be cross-version verifiable. A future hardening pass should adopt explicit canonical serialization.
+
+- **Model drift baseline is immutable.** Once the drift baseline is computed from the first observation window, it is never updated. Legitimate model improvements cannot be captured without re-registration.
+
+- **No performance benchmarks.** The whitepaper claims lightweight operation but provides no measured benchmarks for policy evaluation, audit writing, or verification overhead in v0.
 
 ---
 

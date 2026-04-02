@@ -140,7 +140,7 @@ VERITAS 中的智能体执行被建模为在受控能力上运行的确定性状
 ### 执行循环
 
 ```
-State → Policy → Capability → Audit → Verify → Next State
+State → Policy → Capability → Propose → Verify → Transition → Audit
 ```
 
 每次状态转换均是显式的、经过策略检查的、已审计的，并在智能体进入下一状态前完成验证。该循环有意保持精简——无隐藏中间件、无重量级编排、无增加延迟的抽象层。
